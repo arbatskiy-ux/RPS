@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>PeerPlay needs local network access to discover and connect with nearby players for multiplayer Rock-Paper-Scissors.</string>
+	<string>RPS needs local network access to discover and connect with nearby players.</string>
 	<key>NSBonjourServices</key>
 	<array>
-		<string>_peerplay-game._tcp</string>
-		<string>_peerplay-game._udp</string>
+		<string>_rps-game._tcp</string>
+		<string>_rps-game._udp</string>
 	</array>
 </dict>
 </plist>

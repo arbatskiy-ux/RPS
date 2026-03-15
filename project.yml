@@ -1,0 +1,34 @@
+name: RPS
+options:
+  bundleIdPrefix: com.arbatskiy
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15.0"
+
+targets:
+  RPS:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+      - path: Views
+      - path: GameEngine
+      - path: Network
+      - path: DeviceManagers
+    resources:
+      - path: Assets.xcassets
+      - path: Sounds
+      - path: Info.plist
+    info:
+      path: Info.plist
+      properties:
+        NSLocalNetworkUsageDescription: "Used to connect with nearby players"
+        NSBonjourServices:
+          - "_rps-game._tcp"
+          - "_rps-game._udp"
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.arbatskiy.rps
+      MARKETING_VERSION: "1.0.0"
+      CURRENT_PROJECT_VERSION: 1
+      SWIFT_VERSION: "5.9"
+      INFOPLIST_FILE: Info.plist
