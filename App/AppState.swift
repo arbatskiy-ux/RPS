@@ -6,6 +6,7 @@ final class AppState: ObservableObject {
     enum Screen {
         case lobby
         case game
+        case results
     }
 
     @Published var currentScreen: Screen = .lobby
@@ -39,6 +40,8 @@ final class AppState: ObservableObject {
                 switch phase {
                 case .playing:
                     self?.currentScreen = .game
+                case .results:
+                    self?.currentScreen = .results
                 case .idle:
                     self?.currentScreen = .lobby
                 default:

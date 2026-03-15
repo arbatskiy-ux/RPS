@@ -9,6 +9,8 @@ struct ContentView: View {
             LobbyView()
         case .game:
             GameView()
+        case .results:
+            ResultsView()
         }
     }
 }

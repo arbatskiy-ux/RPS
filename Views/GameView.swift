@@ -11,11 +11,15 @@ struct GameView: View {
                 HStack {
                     ScoreboardView(engine: appState.gameEngine)
                     Spacer()
-                    Button("Leave") {
-                        appState.gameEngine.endGame()
-                        appState.session.disconnect()
+                    VStack(spacing: 4) {
+                        TimerView(timer: appState.gameEngine.roundTimer)
+                        Button("Leave") {
+                            appState.gameEngine.endGame()
+                            appState.session.disconnect()
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
-                    .buttonStyle(.bordered)
                 }
                 .padding()
 

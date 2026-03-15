@@ -29,6 +29,12 @@ struct LobbyView: View {
                         appState.session.startBrowsing()
                     }
                 }
+
+                if isHosting && !appState.session.connectedPeers.isEmpty {
+                    ActionButton(title: "Start Game", style: .primary) {
+                        appState.gameEngine.startGame()
+                    }
+                }
             }
             .padding()
             .navigationTitle("Lobby")

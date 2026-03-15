@@ -6,6 +6,7 @@ final class GameEngine: ObservableObject {
 
     @Published private(set) var phase: GamePhase = .idle
     @Published private(set) var state: GameState = GameState()
+    let roundTimer = RoundTimer(duration: 60)
 
     private let session: MultipeerSession
     private let hapticManager: HapticManager
@@ -15,6 +16,7 @@ final class GameEngine: ObservableObject {
         self.session = session
         self.hapticManager = hapticManager
         subscribeToNetwork()
+        subscribeToTimer()
     }
 
     // MARK: - Public API
@@ -23,12 +25,17 @@ final class GameEngine: ObservableObject {
         guard session.connectedPeers.isEmpty == false else { return }
         phase = .playing
         state = GameState()
+        roundTimer.start()
         broadcast(.gameStarted)
     }
 
     func endGame() {
-        phase = .idle
+        roundTimer.stop()
+        phase = .results
         broadcast(.gameEnded)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            self?.phase = .idle
+        }
     }
 
     func handlePlayerAction(_ action: PlayerAction) {
@@ -42,6 +49,13 @@ final class GameEngine: ObservableObject {
     }
 
     // MARK: - Private
+
+    private func subscribeToTimer() {
+        roundTimer.onFinished
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.endGame() }
+            .store(in: &cancellables)
+    }
 
     private func subscribeToNetwork() {
         session.receivedMessage
