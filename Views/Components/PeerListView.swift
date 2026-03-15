@@ -5,18 +5,35 @@ struct PeerListView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Connected Peers (\(session.connectedPeers.count))")
+            Text("Players (\(session.connectedPeers.count + 1))")
                 .font(.headline)
 
-            if session.connectedPeers.isEmpty {
-                Text("No peers connected yet")
+            // Local player
+            HStack {
+                Image(systemName: session.isHost ? "crown.fill" : "person.fill")
+                    .foregroundStyle(session.isHost ? .orange : .blue)
+                Text(session.localPeerID.displayName)
+                Text("(You)")
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding()
+                Spacer()
+            }
+            .padding(.vertical, 4)
+
+            // Connected peers
+            if session.connectedPeers.isEmpty && session.role != nil {
+                HStack {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Waiting for other players...")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
             } else {
                 ForEach(session.connectedPeers, id: \.displayName) { peer in
                     HStack {
-                        Image(systemName: "iphone")
+                        Image(systemName: session.isHost ? "person.fill" : "crown.fill")
+                            .foregroundStyle(session.isHost ? .blue : .orange)
                         Text(peer.displayName)
                         Spacer()
                         Image(systemName: "circle.fill")

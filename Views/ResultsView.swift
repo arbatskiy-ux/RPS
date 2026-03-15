@@ -11,7 +11,7 @@ struct ResultsView: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            Text("Round Over!")
+            Text("Game Over!")
                 .font(.largeTitle.bold())
 
             VStack(spacing: 12) {
