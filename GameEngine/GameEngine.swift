@@ -2,13 +2,14 @@ import Foundation
 import Combine
 
 /// Orchestrates Rock-Paper-Scissors.
-/// The HOST is the single source of truth: it runs the round loop, collects choices,
-/// determines winners, and syncs results to the GUEST.
+/// The HOST is the single source of truth: it runs the round loop, generates random moves
+/// using a secure RNG, collects choices, determines winners, and syncs results to the GUEST.
 final class GameEngine: ObservableObject {
 
     @Published private(set) var phase: GamePhase = .idle
     @Published private(set) var state: GameState = GameState()
     @Published private(set) var countdownValue: Int = 3
+    @Published private(set) var countdownLabel: String = ""
     @Published private(set) var choiceTimeRemaining: Int = 5
 
     /// Set once the local player makes a choice this round. Reset each round.
@@ -17,13 +18,17 @@ final class GameEngine: ObservableObject {
     let roundTimer = RoundTimer(duration: 5)
 
     private let session: MultipeerSession
-    private let hapticManager: HapticManager
+    let hapticManager: HapticManager
     private var cancellables = Set<AnyCancellable>()
     private var countdownTimer: AnyCancellable?
 
     // HOST-only: collected choices for the current round
     private var hostChoice: RPSChoice?
     private var guestChoice: RPSChoice?
+
+    // Shake mode: HOST waits for both players to shake 3 times
+    private var hostShakeReady = false
+    private var guestShakeReady = false
 
     var isHost: Bool { session.isHost }
 
@@ -38,15 +43,21 @@ final class GameEngine: ObservableObject {
     // MARK: - Public API
 
     /// HOST only: begins the match.
-    func startGame() {
+    func startGame(shakeMode: Bool = false) {
         guard isHost, !session.connectedPeers.isEmpty else { return }
 
         state = GameState()
         state.hostName = session.localPeerID.displayName
         state.guestName = session.connectedPeers.first?.displayName ?? "Guest"
+        state.isShakeModeEnabled = shakeMode
 
         broadcast(.gameStarted(state))
-        startRound()
+
+        if shakeMode {
+            enterShakePhase()
+        } else {
+            startRound()
+        }
     }
 
     /// Both: player picks Rock, Paper, or Scissors.
@@ -73,9 +84,36 @@ final class GameEngine: ObservableObject {
         }
     }
 
+    /// Called by shake mode when the local player has completed 3 shakes.
+    func localPlayerShakeReady() {
+        if isHost {
+            hostShakeReady = true
+            tryStartAfterShakes()
+        } else {
+            broadcast(.playerShakeReady)
+        }
+    }
+
+    // MARK: - Shake Mode
+
+    private func enterShakePhase() {
+        phase = .shakeReady
+        hostShakeReady = false
+        guestShakeReady = false
+        if isHost {
+            broadcast(.shakePhaseStarted)
+        }
+    }
+
+    private func tryStartAfterShakes() {
+        guard isHost, hostShakeReady, guestShakeReady else { return }
+        broadcast(.shakePhaseCompleted)
+        startRound()
+    }
+
     // MARK: - Round Flow (HOST drives this)
 
-    /// Starts the 3-2-1 countdown, then opens the choosing phase.
+    /// Starts the "Rock / Paper / Scissors" countdown, then opens the choosing phase.
     private func startRound() {
         guard isHost else { return }
 
@@ -99,16 +137,17 @@ final class GameEngine: ObservableObject {
         }
     }
 
-    /// HOST: called when the 5s choice timer expires. Assigns random choice to anyone who didn't pick.
+    /// HOST: called when the 5s choice timer expires.
+    /// Assigns a secure random choice to anyone who didn't pick.
     private func choiceTimerExpired() {
         guard isHost, phase == .choosing else { return }
 
         if hostChoice == nil {
-            hostChoice = .random()
+            hostChoice = RPSChoice.secureRandom()
             localChoice = hostChoice
         }
         if guestChoice == nil {
-            guestChoice = .random()
+            guestChoice = RPSChoice.secureRandom()
         }
         resolveRound()
     }
@@ -120,7 +159,7 @@ final class GameEngine: ObservableObject {
         resolveRound()
     }
 
-    /// HOST: determine winner, broadcast result, advance state.
+    /// HOST: determine winner, broadcast result, trigger haptics, advance state.
     private func resolveRound() {
         guard isHost, let hc = hostChoice, let gc = guestChoice else { return }
 
@@ -138,7 +177,6 @@ final class GameEngine: ObservableObject {
         } else if result.winnerName == state.guestName {
             state.guestWins += 1
         }
-        // Draws don't count — replay the round
 
         state.roundResults.append(result)
 
@@ -146,7 +184,9 @@ final class GameEngine: ObservableObject {
         phase = .reveal(result)
         broadcast(.roundResult(result))
         broadcast(.stateSync(state))
-        hapticManager.playNotification(type: result.winnerName == state.hostName ? .success : .error)
+
+        // Haptic: winner gets light tap, loser gets 4x strong pattern
+        playRoundResultHaptics(result: result, localName: state.hostName)
 
         // After reveal delay, either next round or match end
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
@@ -160,7 +200,12 @@ final class GameEngine: ObservableObject {
         if state.isMatchOver {
             phase = .matchResult
             broadcast(.matchEnded(state))
-            hapticManager.playNotification(type: state.matchWinner == state.hostName ? .success : .error)
+            // Final haptic for match result
+            if state.matchWinner == state.hostName {
+                hapticManager.playWinnerFeedback()
+            } else {
+                hapticManager.playLoserFeedback()
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
                 self?.phase = .idle
             }
@@ -169,16 +214,36 @@ final class GameEngine: ObservableObject {
             if result.winnerName != nil {
                 state.currentRound += 1
             }
-            startRound()
+
+            if state.isShakeModeEnabled {
+                enterShakePhase()
+            } else {
+                startRound()
+            }
         }
     }
 
-    // MARK: - Countdown
+    // MARK: - Haptic Patterns
+
+    private func playRoundResultHaptics(result: RoundResult, localName: String) {
+        if result.winnerName == nil {
+            // Draw — neutral feedback
+            hapticManager.playImpact(style: .medium)
+        } else if result.winnerName == localName {
+            hapticManager.playWinnerFeedback()
+        } else {
+            hapticManager.playLoserFeedback()
+        }
+    }
+
+    // MARK: - Countdown ("Rock... Paper... Scissors!")
 
     private func runCountdown(completion: @escaping () -> Void) {
         countdownValue = 3
+        countdownLabel = CountdownLabel.forTick(3).rawValue
         phase = .countdown(3)
         localChoice = nil
+        hapticManager.playCountdownPulse()
         broadcast(.roundCountdown(3))
 
         var remaining = 3
@@ -188,9 +253,10 @@ final class GameEngine: ObservableObject {
                 remaining -= 1
                 if remaining > 0 {
                     self?.countdownValue = remaining
+                    self?.countdownLabel = CountdownLabel.forTick(remaining).rawValue
                     self?.phase = .countdown(remaining)
                     self?.broadcast(.roundCountdown(remaining))
-                    self?.hapticManager.playImpact(style: .light)
+                    self?.hapticManager.playCountdownPulse()
                 } else {
                     self?.countdownTimer?.cancel()
                     completion()
@@ -222,9 +288,10 @@ final class GameEngine: ObservableObject {
         case .roundCountdown(let value):
             if !isHost {
                 countdownValue = value
+                countdownLabel = CountdownLabel.forTick(value).rawValue
                 phase = .countdown(value)
                 localChoice = nil
-                hapticManager.playImpact(style: .light)
+                hapticManager.playCountdownPulse()
             }
 
         case .startChoosing:
@@ -238,8 +305,7 @@ final class GameEngine: ObservableObject {
             if !isHost {
                 roundTimer.stop()
                 phase = .reveal(result)
-                let isWinner = result.winnerName == state.guestName
-                hapticManager.playNotification(type: isWinner ? .success : .error)
+                playRoundResultHaptics(result: result, localName: state.guestName)
             }
 
         case .matchEnded(let finalState):
@@ -247,7 +313,11 @@ final class GameEngine: ObservableObject {
                 state = finalState
                 roundTimer.stop()
                 phase = .matchResult
-                hapticManager.playNotification(type: state.matchWinner == state.guestName ? .success : .error)
+                if state.matchWinner == state.guestName {
+                    hapticManager.playWinnerFeedback()
+                } else {
+                    hapticManager.playLoserFeedback()
+                }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
                     self?.phase = .idle
                 }
@@ -258,11 +328,27 @@ final class GameEngine: ObservableObject {
                 state = syncedState
             }
 
+        case .shakePhaseStarted:
+            if !isHost {
+                phase = .shakeReady
+            }
+
+        case .shakePhaseCompleted:
+            if !isHost {
+                // HOST will send countdown next
+            }
+
         // --- HOST receives from GUEST ---
         case .playerChoice(let choice):
             if isHost {
                 guestChoice = choice
                 tryResolveRound()
+            }
+
+        case .playerShakeReady:
+            if isHost {
+                guestShakeReady = true
+                tryStartAfterShakes()
             }
         }
     }
@@ -273,7 +359,6 @@ final class GameEngine: ObservableObject {
             .sink { [weak self] in self?.choiceTimerExpired() }
             .store(in: &cancellables)
 
-        // Track countdown for UI
         roundTimer.$timeRemaining
             .receive(on: DispatchQueue.main)
             .sink { [weak self] t in self?.choiceTimeRemaining = Int(t) }

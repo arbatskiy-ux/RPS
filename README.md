@@ -1,58 +1,105 @@
-# PeerPlay
+# PeerPlay — Rock Paper Scissors
 
-A modular peer-to-peer iOS game built with SwiftUI, MultipeerConnectivity, CoreHaptics, and CoreMotion.
+A peer-to-peer Rock-Paper-Scissors game for iOS built with SwiftUI, MultipeerConnectivity, CoreHaptics, and CoreMotion.
+
+## Game Rules
+
+- Two players play Rock-Paper-Scissors over local network (Bluetooth/Wi-Fi)
+- Best of 3 — first to win 2 rounds wins the match
+- Draws replay the round without advancing the counter
+
+## Screens
+
+| Screen | Description |
+|---|---|
+| **Home** | Main menu with "Find Player" button |
+| **Connection** | Shows nearby players, connection status, host/join, shake mode toggle |
+| **Game** | Countdown ("Rock... Paper... Scissors!"), choosing, reveal |
+| **Result** | Match winner, round-by-round history with symbols |
+
+## Round Flow
+
+```
+Players connected → HOST starts game
+        ↓
+  [Shake Mode?] → Each player shakes 3 times to begin
+        ↓
+  Countdown: "Rock..." (3) → "Paper..." (2) → "Scissors!" (1)
+  + haptic pulse each tick
+        ↓
+  Both players choose (5s timer, random if timeout)
+        ↓
+  HOST determines winner (secure random for timeouts)
+        ↓
+  Symbols displayed on both devices (same result)
+        ↓
+  Winner: light confirmation vibration
+  Loser: 4x strong pulse (0.4s pauses)
+        ↓
+  Next round (or match results)
+```
 
 ## Architecture
 
 ```
 PeerPlay/
-├── App/                  # Entry point & global state
-│   ├── PeerPlayApp.swift     — @main, App Scene
-│   └── AppState.swift        — ObservableObject owning all managers
-│
-├── Views/                # SwiftUI presentation layer
-│   ├── ContentView.swift     — Root screen router
-│   ├── LobbyView.swift       — Peer discovery & connection
-│   ├── GameView.swift        — In-game screen
-│   └── Components/           — Reusable UI components
-│
-├── GameEngine/           # Pure game logic (no UI, no network details)
-│   ├── GameEngine.swift      — Orchestrates state, events, feedback
-│   ├── GameState.swift       — Value types: GameState, GamePhase, PlayerAction
-│   └── (add game-specific logic here)
-│
-├── Network/              # MultipeerConnectivity abstraction
-│   ├── MultipeerSession.swift — MCSession + advertiser + browser
-│   └── MessageProtocol.swift  — Codable GameMessage wire format
-│
-└── DeviceManagers/       # Hardware abstraction
-    ├── HapticManager.swift   — CoreHaptics with UIKit fallback
-    └── MotionManager.swift   — CoreMotion shake detection
+├── App/
+│   ├── PeerPlayApp.swift        — @main entry point
+│   └── AppState.swift           — Screen routing, dependency graph
+├── Views/
+│   ├── ContentView.swift        — Screen router
+│   ├── HomeView.swift           — Home Screen (Find Player)
+│   ├── ConnectionView.swift     — Connection Screen (host/join/status)
+│   ├── GameView.swift           — Game Screen (countdown, choosing, reveal, shake mode)
+│   ├── ResultsView.swift        — Result Screen (winner, round history)
+│   └── Components/
+│       ├── ActionButton.swift
+│       ├── PeerListView.swift
+│       └── PlayerNameField.swift
+├── GameEngine/
+│   ├── GameEngine.swift         — HOST-authoritative game loop
+│   ├── GameState.swift          — RPSChoice, RoundResult, GamePhase, CountdownLabel
+│   └── RoundTimer.swift         — Countdown timer with Combine
+├── Network/
+│   ├── MultipeerSession.swift   — MCSession + roles (host/guest)
+│   └── MessageProtocol.swift    — Codable wire protocol
+├── DeviceManagers/
+│   ├── HapticManager.swift      — CoreHaptics (winner/loser/countdown patterns)
+│   ├── MotionManager.swift      — CoreMotion (shake detection + counted shakes)
+│   └── AudioManager.swift       — AVAudioPlayer for sound effects
+├── Assets.xcassets/
+│   ├── rock.imageset/rock.png   — placeholder
+│   ├── paper.imageset/paper.png — placeholder
+│   ├── scissors.imageset/scissors.png — placeholder
+│   └── AppIcon.appiconset/app_icon.png — placeholder
+└── Sounds/
+    ├── rock.wav                 — placeholder
+    ├── paper.wav                — placeholder
+    ├── scissors.wav             — placeholder
+    └── countdown.wav            — placeholder
 ```
 
-## Module responsibilities
+## Haptic Feedback
 
-| Module | Responsibility |
+| Event | Pattern |
 |---|---|
-| `App` | Wires everything together; owns the dependency graph |
-| `Views` | Renders state; delegates actions to GameEngine/Session |
-| `GameEngine` | Processes actions, maintains scores, triggers haptics |
-| `Network` | Sends/receives `GameMessage` over MultipeerConnectivity |
-| `DeviceManagers` | Wraps platform APIs (haptics, motion) behind simple interfaces |
+| Countdown tick | Short pulse (medium intensity) |
+| Player chooses | Medium impact |
+| Shake detected | Short pulse |
+| **Winner** | Single light confirmation tap |
+| **Loser** | 4× strong vibration, 0.4s pause between each |
 
 ## Requirements
 
-- iOS 16+
-- Xcode 15+
-- Physical devices for MultipeerConnectivity testing (simulator has limited support)
+- iOS 16+, Xcode 15+
+- Two physical devices (simulator has limited MultipeerConnectivity support)
 
-## Getting started
+## Setup
 
-1. Open `PeerPlay.xcodeproj` in Xcode (create via File → New → Project, then add these sources)
-2. Add capabilities: **Wireless Accessory Configuration** is not needed; add **Multipeer Connectivity** usage description to `Info.plist`
-3. Build & run on two physical devices on the same Wi-Fi / Bluetooth
-
-## Info.plist keys required
+1. Create Xcode project, add source files
+2. Replace placeholder images in `Assets.xcassets/` with actual artwork
+3. Replace placeholder `.wav` files in `Sounds/` with actual audio
+4. Add to `Info.plist`:
 
 ```xml
 <key>NSLocalNetworkUsageDescription</key>
@@ -63,3 +110,5 @@ PeerPlay/
     <string>_peerplay-game._udp</string>
 </array>
 ```
+
+5. Build & run on two physical devices on the same Wi-Fi / Bluetooth

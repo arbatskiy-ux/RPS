@@ -1,17 +1,15 @@
 import SwiftUI
 import MultipeerConnectivity
 
-struct LobbyView: View {
+/// Connection Screen — shows nearby players and connection status.
+/// HOST can start a normal game or shake mode game.
+struct ConnectionView: View {
     @EnvironmentObject private var appState: AppState
+    @State private var shakeMode = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
-                Text("PeerPlay")
-                    .font(.largeTitle.bold())
-
-                PlayerNameField(name: $appState.playerName)
-
                 roleIndicator
 
                 Divider()
@@ -23,14 +21,34 @@ struct LobbyView: View {
                 connectionButtons
 
                 if appState.session.isHost && appState.session.isConnected {
-                    ActionButton(title: "Start Game", style: .primary) {
-                        appState.gameEngine.startGame()
+                    VStack(spacing: 12) {
+                        // Shake mode toggle
+                        Toggle(isOn: $shakeMode) {
+                            HStack {
+                                Image(systemName: "iphone.radiowaves.left.and.right")
+                                Text("Shake Mode")
+                                    .font(.subheadline)
+                            }
+                        }
+                        .tint(.orange)
+                        .padding(.horizontal)
+
+                        ActionButton(title: "Start Game", style: .primary) {
+                            appState.gameEngine.startGame(shakeMode: shakeMode)
+                        }
                     }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .padding()
-            .navigationTitle("Lobby")
+            .navigationTitle("Connection")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Back") {
+                        appState.goToHome()
+                    }
+                }
+            }
             .animation(.easeInOut, value: appState.session.isConnected)
             .animation(.easeInOut, value: appState.session.role)
         }

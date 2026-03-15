@@ -24,6 +24,12 @@ enum RPSChoice: String, Codable, CaseIterable {
         }
     }
 
+    /// Image asset name (placeholder).
+    var imageName: String { rawValue }
+
+    /// Sound asset name (placeholder).
+    var soundName: String { rawValue }
+
     /// Returns .win if self beats other, .lose if other beats self, .draw if equal.
     func outcome(against other: RPSChoice) -> RoundOutcome {
         if self == other { return .draw }
@@ -35,8 +41,10 @@ enum RPSChoice: String, Codable, CaseIterable {
         }
     }
 
-    static func random() -> RPSChoice {
-        allCases.randomElement()!
+    /// Secure, unbiased random generation using SystemRandomNumberGenerator.
+    static func secureRandom() -> RPSChoice {
+        var rng = SystemRandomNumberGenerator()
+        return allCases.randomElement(using: &rng)!
     }
 }
 
@@ -76,6 +84,7 @@ struct GameState: Codable, Equatable {
     var hostWins: Int = 0
     var guestWins: Int = 0
     var roundResults: [RoundResult] = []
+    var isShakeModeEnabled: Bool = false
 
     /// Name of the match winner, or nil if match is still going.
     var matchWinner: String? {
@@ -90,11 +99,27 @@ struct GameState: Codable, Equatable {
 // MARK: - Game Phase
 
 enum GamePhase: Equatable {
-    case idle              // in lobby
-    case countdown(Int)    // 3-2-1 before each round
+    case idle              // home screen / lobby
+    case shakeReady        // shake mode: waiting for 3 shakes to begin
+    case countdown(Int)    // 3-2-1 with "Rock" / "Paper" / "Scissors" text
     case choosing          // players pick rock/paper/scissors
     case reveal(RoundResult) // showing both choices + round winner
     case matchResult       // final scoreboard
+}
+
+/// The text shown during countdown ticks.
+enum CountdownLabel: String {
+    case rock = "Rock..."
+    case paper = "Paper..."
+    case scissors = "Scissors!"
+
+    static func forTick(_ tick: Int) -> CountdownLabel {
+        switch tick {
+        case 3: return .rock
+        case 2: return .paper
+        default: return .scissors
+        }
+    }
 }
 
 // MARK: - Player Action

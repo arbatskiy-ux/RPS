@@ -4,12 +4,13 @@ import Combine
 /// Global application state shared across the entire app.
 final class AppState: ObservableObject {
     enum Screen {
-        case lobby
-        case game
-        case results
+        case home          // Home Screen — main menu
+        case connection    // Connection Screen — find/connect players
+        case game          // Game Screen — countdown, choosing, reveal
+        case results       // Result Screen — match winner + history
     }
 
-    @Published var currentScreen: Screen = .lobby
+    @Published var currentScreen: Screen = .home
     @Published var playerName: String = UIDevice.current.name
 
     let session: MultipeerSession
@@ -38,14 +39,28 @@ final class AppState: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] phase in
                 switch phase {
-                case .countdown, .choosing, .reveal:
+                case .shakeReady, .countdown, .choosing, .reveal:
                     self?.currentScreen = .game
                 case .matchResult:
                     self?.currentScreen = .results
                 case .idle:
-                    self?.currentScreen = .lobby
+                    // Go to connection screen if connected, home if not
+                    if self?.session.isConnected == true {
+                        self?.currentScreen = .connection
+                    } else {
+                        self?.currentScreen = .home
+                    }
                 }
             }
             .store(in: &cancellables)
+    }
+
+    func goToConnection() {
+        currentScreen = .connection
+    }
+
+    func goToHome() {
+        session.disconnect()
+        currentScreen = .home
     }
 }

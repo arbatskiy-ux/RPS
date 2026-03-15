@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// Game Screen — displays countdown, symbols, shake mode, and choosing phase.
 struct GameView: View {
     @EnvironmentObject private var appState: AppState
 
@@ -23,7 +24,6 @@ struct GameView: View {
 
     private var topBar: some View {
         HStack {
-            // Score: HOST vs GUEST
             HStack(spacing: 16) {
                 PlayerScorePill(name: engine.state.hostName, wins: engine.state.hostWins, isLocal: engine.isHost)
                 Text("vs")
@@ -48,16 +48,28 @@ struct GameView: View {
     @ViewBuilder
     private var centerContent: some View {
         switch engine.phase {
-        case .countdown(let value):
-            VStack(spacing: 12) {
+        case .shakeReady:
+            ShakeModeView(motionManager: appState.motionManager, engine: engine)
+
+        case .countdown:
+            VStack(spacing: 16) {
                 Text("Round \(engine.state.currentRound)")
                     .font(.title3)
                     .foregroundStyle(.white.opacity(0.6))
-                Text("\(value)")
-                    .font(.system(size: 120, weight: .bold, design: .rounded))
+
+                // "Rock..." / "Paper..." / "Scissors!"
+                Text(engine.countdownLabel)
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
+                    .transition(.scale.combined(with: .opacity))
+                    .animation(.easeOut(duration: 0.3), value: engine.countdownLabel)
+                    .id(engine.countdownLabel) // force re-render for animation
+
+                Text("\(engine.countdownValue)")
+                    .font(.system(size: 100, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.3))
                     .contentTransition(.numericText())
-                    .animation(.easeOut(duration: 0.3), value: value)
+                    .animation(.easeOut(duration: 0.3), value: engine.countdownValue)
             }
 
         case .choosing:
@@ -80,7 +92,6 @@ struct GameView: View {
                         .foregroundStyle(.white)
                 }
 
-                // Choice timer
                 Text("\(engine.choiceTimeRemaining)")
                     .font(.system(size: 36, weight: .bold, design: .rounded))
                     .foregroundStyle(engine.choiceTimeRemaining <= 2 ? .red : .white.opacity(0.8))
@@ -91,16 +102,12 @@ struct GameView: View {
         case .reveal(let result):
             RevealView(result: result, state: engine.state, isHost: engine.isHost)
 
-        case .matchResult:
-            // Handled by ResultsView via AppState screen routing
-            EmptyView()
-
-        case .idle:
+        case .matchResult, .idle:
             EmptyView()
         }
     }
 
-    // MARK: - Bottom Area (choice buttons during choosing)
+    // MARK: - Bottom Area
 
     @ViewBuilder
     private var bottomArea: some View {
@@ -110,6 +117,54 @@ struct GameView: View {
             }
             .padding(.bottom, 40)
             .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+}
+
+// MARK: - Shake Mode View
+
+struct ShakeModeView: View {
+    @ObservedObject var motionManager: MotionManager
+    @ObservedObject var engine: GameEngine
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "iphone.radiowaves.left.and.right")
+                .font(.system(size: 60))
+                .foregroundStyle(.orange)
+                .symbolEffect(.pulse, isActive: true)
+
+            Text("Shake to Start!")
+                .font(.title.bold())
+                .foregroundStyle(.white)
+
+            // Shake counter: 3 dots
+            HStack(spacing: 16) {
+                ForEach(0..<3, id: \.self) { index in
+                    Circle()
+                        .fill(index < motionManager.shakeCount ? Color.orange : Color.white.opacity(0.2))
+                        .frame(width: 24, height: 24)
+                        .animation(.easeInOut(duration: 0.2), value: motionManager.shakeCount)
+                }
+            }
+
+            Text("\(motionManager.shakeCount) / 3")
+                .font(.title2.monospacedDigit())
+                .foregroundStyle(.white.opacity(0.6))
+        }
+        .onAppear {
+            motionManager.startCountedShakes(
+                target: 3,
+                onShake: {
+                    engine.hapticManager.playShakePulse()
+                },
+                onComplete: {
+                    engine.localPlayerShakeReady()
+                }
+            )
+        }
+        .onDisappear {
+            motionManager.stopShakeDetection()
         }
     }
 }
@@ -148,6 +203,7 @@ struct RPSChoiceButtons: View {
                     onChoice(choice)
                 } label: {
                     VStack(spacing: 8) {
+                        // Placeholder: use Image(choice.imageName) when assets are added
                         Text(choice.symbol)
                             .font(.system(size: 56))
                         Text(choice.label)
@@ -200,9 +256,10 @@ struct RevealView: View {
                 .font(.title3)
                 .foregroundStyle(.white.opacity(0.6))
 
-            // Symbols face-off
+            // Both moves displayed — same result on both devices
             HStack(spacing: 40) {
                 VStack(spacing: 8) {
+                    // Placeholder: use Image(localChoice.imageName) when assets are added
                     Text(localChoice.symbol)
                         .font(.system(size: 72))
                     Text("You")
@@ -223,7 +280,6 @@ struct RevealView: View {
                 }
             }
 
-            // Result
             Text(resultText)
                 .font(.largeTitle.bold())
                 .foregroundStyle(resultColor)

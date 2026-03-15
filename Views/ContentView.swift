@@ -5,8 +5,10 @@ struct ContentView: View {
 
     var body: some View {
         switch appState.currentScreen {
-        case .lobby:
-            LobbyView()
+        case .home:
+            HomeView()
+        case .connection:
+            ConnectionView()
         case .game:
             GameView()
         case .results:
