@@ -16,7 +16,7 @@ struct HomeView: View {
                         .font(.system(size: 80))
                         .foregroundStyle(.blue)
 
-                    Text("PeerPlay")
+                    Text("RPS")
                         .font(.system(size: 42, weight: .bold, design: .rounded))
 
                     Text("Rock • Paper • Scissors")

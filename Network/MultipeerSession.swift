@@ -18,7 +18,7 @@ enum ConnectionEvent {
 /// The device that starts advertising becomes the HOST; the device that browses and joins becomes the GUEST.
 final class MultipeerSession: NSObject, ObservableObject {
 
-    private static let serviceType = "peerplay-game"
+    private static let serviceType = "rps-game"
 
     let localPeerID: MCPeerID
     private let session: MCSession

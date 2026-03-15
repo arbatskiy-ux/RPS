@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct PeerPlayApp: App {
+struct RPSApp: App {
     @StateObject private var appState = AppState()
 
     var body: some Scene {

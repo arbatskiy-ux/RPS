@@ -1,4 +1,4 @@
-# PeerPlay — Rock Paper Scissors
+# RPS — Rock Paper Scissors
 
 A peer-to-peer Rock-Paper-Scissors game for iOS built with SwiftUI, MultipeerConnectivity, CoreHaptics, and CoreMotion.
 
@@ -42,9 +42,9 @@ Players connected → HOST starts game
 ## Architecture
 
 ```
-PeerPlay/
+RPS/
 ├── App/
-│   ├── PeerPlayApp.swift        — @main entry point
+│   ├── RPSApp.swift             — @main entry point
 │   └── AppState.swift           — Screen routing, dependency graph
 ├── Views/
 │   ├── ContentView.swift        — Screen router
@@ -106,8 +106,8 @@ PeerPlay/
 <string>Used to connect with nearby players</string>
 <key>NSBonjourServices</key>
 <array>
-    <string>_peerplay-game._tcp</string>
-    <string>_peerplay-game._udp</string>
+    <string>_rps-game._tcp</string>
+    <string>_rps-game._udp</string>
 </array>
 ```
 
