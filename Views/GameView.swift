@@ -3,163 +3,236 @@ import SwiftUI
 struct GameView: View {
     @EnvironmentObject private var appState: AppState
 
+    private var engine: GameEngine { appState.gameEngine }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            switch appState.gameEngine.phase {
-            case .countdown(let value):
-                CountdownOverlay(value: value)
-
-            case .movePause:
-                VStack(spacing: 12) {
-                    Text("Round \(appState.gameEngine.state.round) of \(appState.gameEngine.state.totalRounds)")
-                        .font(.title2.bold())
-                        .foregroundStyle(.white)
-                    Text("Get ready...")
-                        .foregroundStyle(.white.opacity(0.7))
-                }
-
-            default:
-                gameContent
-            }
-        }
-        .onAppear {
-            appState.motionManager.startShakeDetection { [weak appState] in
-                appState?.gameEngine.handleShake()
-            }
-        }
-        .onDisappear {
-            appState.motionManager.stopShakeDetection()
-        }
-    }
-
-    private var gameContent: some View {
-        VStack(spacing: 0) {
-            // Top bar: scoreboard + timer + leave
-            HStack(alignment: .top) {
-                ScoreboardView(engine: appState.gameEngine)
+            VStack(spacing: 0) {
+                topBar
                 Spacer()
-                VStack(spacing: 4) {
-                    TimerView(timer: appState.gameEngine.roundTimer)
-                    Text("Round \(appState.gameEngine.state.round)/\(appState.gameEngine.state.totalRounds)")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
-                    Button("Leave") {
-                        appState.gameEngine.endGame()
-                        appState.session.disconnect()
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .tint(.red)
-                }
-            }
-            .padding()
-
-            Spacer()
-
-            // Current move instruction
-            if let move = appState.gameEngine.state.currentMove {
-                MoveInstructionView(move: move)
-            }
-
-            Spacer()
-
-            // Action area — context-sensitive controls
-            if let move = appState.gameEngine.state.currentMove {
-                moveControls(for: move)
-                    .padding(.bottom, 40)
+                centerContent
+                Spacer()
+                bottomArea
             }
         }
     }
+
+    // MARK: - Top Bar
+
+    private var topBar: some View {
+        HStack {
+            // Score: HOST vs GUEST
+            HStack(spacing: 16) {
+                PlayerScorePill(name: engine.state.hostName, wins: engine.state.hostWins, isLocal: engine.isHost)
+                Text("vs")
+                    .font(.headline)
+                    .foregroundStyle(.white.opacity(0.5))
+                PlayerScorePill(name: engine.state.guestName, wins: engine.state.guestWins, isLocal: !engine.isHost)
+            }
+            Spacer()
+            Button("Leave") {
+                engine.endGame()
+                appState.session.disconnect()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .tint(.red)
+        }
+        .padding()
+    }
+
+    // MARK: - Center Content (phase-dependent)
 
     @ViewBuilder
-    private func moveControls(for move: Move) -> some View {
-        switch move.kind {
-        case .tapFast:
-            Button {
-                appState.gameEngine.handlePlayerAction(.tap)
-            } label: {
-                Text("TAP!")
-                    .font(.title.bold())
-                    .frame(width: 160, height: 160)
-                    .background(Color.green.opacity(0.8))
+    private var centerContent: some View {
+        switch engine.phase {
+        case .countdown(let value):
+            VStack(spacing: 12) {
+                Text("Round \(engine.state.currentRound)")
+                    .font(.title3)
+                    .foregroundStyle(.white.opacity(0.6))
+                Text("\(value)")
+                    .font(.system(size: 120, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
-                    .clipShape(Circle())
+                    .contentTransition(.numericText())
+                    .animation(.easeOut(duration: 0.3), value: value)
             }
 
-        case .shakeIt:
-            VStack(spacing: 8) {
-                Image(systemName: "iphone.radiowaves.left.and.right")
-                    .font(.system(size: 60))
-                    .foregroundStyle(.yellow)
-                Text("Shake your device!")
-                    .foregroundStyle(.white.opacity(0.8))
-                    .font(.headline)
+        case .choosing:
+            VStack(spacing: 20) {
+                Text("Round \(engine.state.currentRound)")
+                    .font(.title3)
+                    .foregroundStyle(.white.opacity(0.6))
+
+                if engine.localChoice != nil {
+                    VStack(spacing: 12) {
+                        Text(engine.localChoice!.symbol)
+                            .font(.system(size: 80))
+                        Text("Waiting for opponent...")
+                            .foregroundStyle(.white.opacity(0.6))
+                            .font(.headline)
+                    }
+                } else {
+                    Text("Choose your move!")
+                        .font(.title.bold())
+                        .foregroundStyle(.white)
+                }
+
+                // Choice timer
+                Text("\(engine.choiceTimeRemaining)")
+                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .foregroundStyle(engine.choiceTimeRemaining <= 2 ? .red : .white.opacity(0.8))
+                    .contentTransition(.numericText())
+                    .animation(.easeInOut, value: engine.choiceTimeRemaining)
             }
 
-        case .holdSteady:
-            VStack(spacing: 8) {
-                Image(systemName: "hand.raised.fill")
-                    .font(.system(size: 60))
-                    .foregroundStyle(.cyan)
-                Text("Don't move!")
-                    .foregroundStyle(.white.opacity(0.8))
-                    .font(.headline)
+        case .reveal(let result):
+            RevealView(result: result, state: engine.state, isHost: engine.isHost)
+
+        case .matchResult:
+            // Handled by ResultsView via AppState screen routing
+            EmptyView()
+
+        case .idle:
+            EmptyView()
+        }
+    }
+
+    // MARK: - Bottom Area (choice buttons during choosing)
+
+    @ViewBuilder
+    private var bottomArea: some View {
+        if case .choosing = engine.phase, engine.localChoice == nil {
+            RPSChoiceButtons { choice in
+                engine.choose(choice)
             }
+            .padding(.bottom, 40)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
 }
 
 // MARK: - Subviews
 
-struct CountdownOverlay: View {
-    let value: Int
+struct PlayerScorePill: View {
+    let name: String
+    let wins: Int
+    let isLocal: Bool
 
     var body: some View {
-        Text("\(value)")
-            .font(.system(size: 120, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
-            .transition(.scale.combined(with: .opacity))
-            .animation(.easeOut(duration: 0.3), value: value)
+        VStack(spacing: 2) {
+            Text(name)
+                .font(.caption.bold())
+                .foregroundStyle(isLocal ? .yellow : .white)
+                .lineLimit(1)
+            Text("\(wins)")
+                .font(.title2.bold().monospacedDigit())
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
 
-struct MoveInstructionView: View {
-    let move: Move
+struct RPSChoiceButtons: View {
+    let onChoice: (RPSChoice) -> Void
 
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: moveIcon)
-                .font(.system(size: 40))
-                .foregroundStyle(moveColor)
-
-            Text(move.instruction)
-                .font(.title.bold())
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
-        )
-        .padding(.horizontal, 32)
-    }
-
-    private var moveIcon: String {
-        switch move.kind {
-        case .tapFast: return "hand.tap.fill"
-        case .shakeIt: return "iphone.radiowaves.left.and.right"
-        case .holdSteady: return "hand.raised.fill"
+        HStack(spacing: 24) {
+            ForEach(RPSChoice.allCases, id: \.self) { choice in
+                Button {
+                    onChoice(choice)
+                } label: {
+                    VStack(spacing: 8) {
+                        Text(choice.symbol)
+                            .font(.system(size: 56))
+                        Text(choice.label)
+                            .font(.caption.bold())
+                            .foregroundStyle(.white)
+                    }
+                    .frame(width: 100, height: 100)
+                    .background(Color.white.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                }
+            }
         }
     }
+}
 
-    private var moveColor: Color {
-        switch move.kind {
-        case .tapFast: return .green
-        case .shakeIt: return .yellow
-        case .holdSteady: return .cyan
+struct RevealView: View {
+    let result: RoundResult
+    let state: GameState
+    let isHost: Bool
+
+    private var localChoice: RPSChoice {
+        isHost ? result.hostChoice : result.guestChoice
+    }
+
+    private var opponentChoice: RPSChoice {
+        isHost ? result.guestChoice : result.hostChoice
+    }
+
+    private var localName: String {
+        isHost ? state.hostName : state.guestName
+    }
+
+    private var resultText: String {
+        if let winner = result.winnerName {
+            return winner == localName ? "You Win!" : "You Lose!"
+        }
+        return "Draw!"
+    }
+
+    private var resultColor: Color {
+        if let winner = result.winnerName {
+            return winner == localName ? .green : .red
+        }
+        return .yellow
+    }
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Text("Round \(result.round)")
+                .font(.title3)
+                .foregroundStyle(.white.opacity(0.6))
+
+            // Symbols face-off
+            HStack(spacing: 40) {
+                VStack(spacing: 8) {
+                    Text(localChoice.symbol)
+                        .font(.system(size: 72))
+                    Text("You")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+
+                Text("vs")
+                    .font(.title2.bold())
+                    .foregroundStyle(.white.opacity(0.3))
+
+                VStack(spacing: 8) {
+                    Text(opponentChoice.symbol)
+                        .font(.system(size: 72))
+                    Text("Them")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+            }
+
+            // Result
+            Text(resultText)
+                .font(.largeTitle.bold())
+                .foregroundStyle(resultColor)
+
+            if result.winnerName == nil {
+                Text("Replaying round...")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.5))
+            }
         }
     }
 }

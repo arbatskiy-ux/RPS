@@ -1,20 +1,29 @@
 import Foundation
 import Combine
 
-/// Orchestrates game logic. The HOST is the authoritative source of truth:
-/// it generates moves, runs timers, scores actions, and syncs state to GUEST(s).
-/// The GUEST only sends player actions and renders state received from the HOST.
+/// Orchestrates Rock-Paper-Scissors.
+/// The HOST is the single source of truth: it runs the round loop, collects choices,
+/// determines winners, and syncs results to the GUEST.
 final class GameEngine: ObservableObject {
 
     @Published private(set) var phase: GamePhase = .idle
     @Published private(set) var state: GameState = GameState()
     @Published private(set) var countdownValue: Int = 3
-    let roundTimer = RoundTimer(duration: 10) // per-move timer
+    @Published private(set) var choiceTimeRemaining: Int = 5
+
+    /// Set once the local player makes a choice this round. Reset each round.
+    @Published private(set) var localChoice: RPSChoice?
+
+    let roundTimer = RoundTimer(duration: 5)
 
     private let session: MultipeerSession
     private let hapticManager: HapticManager
     private var cancellables = Set<AnyCancellable>()
-    private var moveTimer: AnyCancellable?
+    private var countdownTimer: AnyCancellable?
+
+    // HOST-only: collected choices for the current round
+    private var hostChoice: RPSChoice?
+    private var guestChoice: RPSChoice?
 
     var isHost: Bool { session.isHost }
 
@@ -22,126 +31,146 @@ final class GameEngine: ObservableObject {
         self.session = session
         self.hapticManager = hapticManager
         subscribeToNetwork()
-        subscribeToTimer()
+        subscribeToChoiceTimer()
         subscribeToDisconnect()
     }
 
-    // MARK: - Public API (called from Views)
+    // MARK: - Public API
 
-    /// HOST only: begins the game with a 3-2-1 countdown, then starts the first move.
+    /// HOST only: begins the match.
     func startGame() {
         guard isHost, !session.connectedPeers.isEmpty else { return }
 
         state = GameState()
-        // Initialize scores for all players
-        state.scores[session.localPeerID.displayName] = 0
-        for peer in session.connectedPeers {
-            state.scores[peer.displayName] = 0
-        }
+        state.hostName = session.localPeerID.displayName
+        state.guestName = session.connectedPeers.first?.displayName ?? "Guest"
 
-        runCountdown { [weak self] in
-            self?.phase = .playing
-            self?.broadcast(.gameStarted(self!.state))
-            self?.nextMove()
-        }
+        broadcast(.gameStarted(state))
+        startRound()
     }
 
-    /// Both: report a player action in response to the current move.
-    func handlePlayerAction(_ action: PlayerAction) {
-        if isHost {
-            // HOST scores locally and syncs
-            scoreAction(action, from: session.localPeerID.displayName)
-            syncState()
-        } else {
-            // GUEST sends action to HOST for authoritative scoring
-            broadcast(.playerAction(action))
-        }
+    /// Both: player picks Rock, Paper, or Scissors.
+    func choose(_ choice: RPSChoice) {
+        guard phase == .choosing, localChoice == nil else { return }
+        localChoice = choice
         hapticManager.playImpact(style: .medium)
+
+        if isHost {
+            hostChoice = choice
+            tryResolveRound()
+        } else {
+            broadcast(.playerChoice(choice))
+        }
     }
 
-    /// Called by MotionManager when a shake is detected.
-    func handleShake() {
-        handlePlayerAction(.shake)
-    }
-
-    /// HOST only: called when the player holds steady — reports stability score.
-    func reportSteadyScore(_ score: Double) {
-        handlePlayerAction(.steadyScore(score))
-    }
-
+    /// Abort the match (leave button).
     func endGame() {
         roundTimer.stop()
-        moveTimer?.cancel()
-        phase = .results
+        countdownTimer?.cancel()
+        phase = .idle
         if isHost {
-            broadcast(.gameEnded(state))
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
-            self?.phase = .idle
+            broadcast(.matchEnded(state))
         }
     }
 
-    // MARK: - HOST: Round Flow
+    // MARK: - Round Flow (HOST drives this)
 
-    /// Generates the next random move and broadcasts it to all peers.
-    private func nextMove() {
-        guard isHost, phase == .playing else { return }
+    /// Starts the 3-2-1 countdown, then opens the choosing phase.
+    private func startRound() {
+        guard isHost else { return }
 
-        if state.round > state.totalRounds {
-            endGame()
-            return
+        // Reset per-round state
+        hostChoice = nil
+        guestChoice = nil
+        localChoice = nil
+
+        runCountdown { [weak self] in
+            self?.beginChoosing()
         }
+    }
 
-        let move = Move.random()
-        state.currentMove = move
-        state.timeRemaining = 10
+    private func beginChoosing() {
+        phase = .choosing
+        choiceTimeRemaining = 5
         roundTimer.start()
 
-        broadcast(.newMove(move))
-        syncState()
+        if isHost {
+            broadcast(.startChoosing)
+        }
     }
 
-    /// Called when the per-move timer expires. Advances to next round.
-    private func moveTimerFinished() {
-        guard isHost else { return }
+    /// HOST: called when the 5s choice timer expires. Assigns random choice to anyone who didn't pick.
+    private func choiceTimerExpired() {
+        guard isHost, phase == .choosing else { return }
+
+        if hostChoice == nil {
+            hostChoice = .random()
+            localChoice = hostChoice
+        }
+        if guestChoice == nil {
+            guestChoice = .random()
+        }
+        resolveRound()
+    }
+
+    /// HOST: check if both players have chosen; if so, resolve immediately.
+    private func tryResolveRound() {
+        guard isHost, hostChoice != nil, guestChoice != nil else { return }
         roundTimer.stop()
-        state.round += 1
-        state.currentMove = nil
+        resolveRound()
+    }
 
-        if state.round > state.totalRounds {
-            endGame()
-        } else {
-            // Brief pause between moves
-            phase = .movePause
-            syncState()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-                guard let self, self.phase == .movePause else { return }
-                self.phase = .playing
-                self.nextMove()
-            }
+    /// HOST: determine winner, broadcast result, advance state.
+    private func resolveRound() {
+        guard isHost, let hc = hostChoice, let gc = guestChoice else { return }
+
+        let result = RoundResult.determine(
+            round: state.currentRound,
+            hostChoice: hc,
+            guestChoice: gc,
+            hostName: state.hostName,
+            guestName: state.guestName
+        )
+
+        // Update wins
+        if result.winnerName == state.hostName {
+            state.hostWins += 1
+        } else if result.winnerName == state.guestName {
+            state.guestWins += 1
+        }
+        // Draws don't count — replay the round
+
+        state.roundResults.append(result)
+
+        // Show reveal phase
+        phase = .reveal(result)
+        broadcast(.roundResult(result))
+        broadcast(.stateSync(state))
+        hapticManager.playNotification(type: result.winnerName == state.hostName ? .success : .error)
+
+        // After reveal delay, either next round or match end
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            self?.afterReveal(result: result)
         }
     }
 
-    // MARK: - HOST: Scoring
+    private func afterReveal(result: RoundResult) {
+        guard isHost else { return }
 
-    private func scoreAction(_ action: PlayerAction, from playerName: String) {
-        guard isHost, let currentMove = state.currentMove else { return }
-
-        let points: Int
-        switch (currentMove.kind, action) {
-        case (.tapFast, .tap):
-            points = 1
-        case (.shakeIt, .shake):
-            points = 3
-        case (.holdSteady, .steadyScore(let stability)):
-            // Lower stability value = steadier = more points
-            points = max(1, Int(10 - stability))
-        default:
-            // Wrong action for this move type — no points
-            points = 0
+        if state.isMatchOver {
+            phase = .matchResult
+            broadcast(.matchEnded(state))
+            hapticManager.playNotification(type: state.matchWinner == state.hostName ? .success : .error)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                self?.phase = .idle
+            }
+        } else {
+            // If draw, don't advance round number
+            if result.winnerName != nil {
+                state.currentRound += 1
+            }
+            startRound()
         }
-
-        state.scores[playerName, default: 0] += points
     }
 
     // MARK: - Countdown
@@ -149,10 +178,11 @@ final class GameEngine: ObservableObject {
     private func runCountdown(completion: @escaping () -> Void) {
         countdownValue = 3
         phase = .countdown(3)
+        localChoice = nil
         broadcast(.roundCountdown(3))
 
         var remaining = 3
-        moveTimer = Timer.publish(every: 1, on: .main, in: .common)
+        countdownTimer = Timer.publish(every: 1, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
                 remaining -= 1
@@ -160,8 +190,9 @@ final class GameEngine: ObservableObject {
                     self?.countdownValue = remaining
                     self?.phase = .countdown(remaining)
                     self?.broadcast(.roundCountdown(remaining))
+                    self?.hapticManager.playImpact(style: .light)
                 } else {
-                    self?.moveTimer?.cancel()
+                    self?.countdownTimer?.cancel()
                     completion()
                 }
             }
@@ -185,56 +216,67 @@ final class GameEngine: ObservableObject {
         case .gameStarted(let initialState):
             if !isHost {
                 state = initialState
-                phase = .playing
-            }
-
-        case .gameEnded(let finalState):
-            if !isHost {
-                state = finalState
-                roundTimer.stop()
-                phase = .results
-                DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
-                    self?.phase = .idle
-                }
+                localChoice = nil
             }
 
         case .roundCountdown(let value):
             if !isHost {
                 countdownValue = value
                 phase = .countdown(value)
+                localChoice = nil
+                hapticManager.playImpact(style: .light)
             }
 
-        case .newMove(let move):
+        case .startChoosing:
             if !isHost {
-                state.currentMove = move
-                state.timeRemaining = 10
+                phase = .choosing
+                choiceTimeRemaining = 5
                 roundTimer.start()
-                phase = .playing
-                hapticManager.playNotification(type: .warning)
+            }
+
+        case .roundResult(let result):
+            if !isHost {
+                roundTimer.stop()
+                phase = .reveal(result)
+                let isWinner = result.winnerName == state.guestName
+                hapticManager.playNotification(type: isWinner ? .success : .error)
+            }
+
+        case .matchEnded(let finalState):
+            if !isHost {
+                state = finalState
+                roundTimer.stop()
+                phase = .matchResult
+                hapticManager.playNotification(type: state.matchWinner == state.guestName ? .success : .error)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                    self?.phase = .idle
+                }
             }
 
         case .stateSync(let syncedState):
             if !isHost {
-                // Preserve local phase, update data
-                let currentPhase = phase
                 state = syncedState
-                if currentPhase == .playing { phase = .playing }
             }
 
         // --- HOST receives from GUEST ---
-        case .playerAction(let action):
+        case .playerChoice(let choice):
             if isHost {
-                scoreAction(action, from: message.senderName)
-                syncState()
-                hapticManager.playImpact(style: .light)
+                guestChoice = choice
+                tryResolveRound()
             }
         }
     }
 
-    private func subscribeToTimer() {
+    private func subscribeToChoiceTimer() {
         roundTimer.onFinished
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.moveTimerFinished() }
+            .sink { [weak self] in self?.choiceTimerExpired() }
+            .store(in: &cancellables)
+
+        // Track countdown for UI
+        roundTimer.$timeRemaining
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] t in self?.choiceTimeRemaining = Int(t) }
             .store(in: &cancellables)
     }
 
@@ -243,21 +285,18 @@ final class GameEngine: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
                 if case .peerDisconnected = event {
-                    if self?.phase == .playing || self?.phase == .movePause {
-                        self?.endGame()
+                    guard let self else { return }
+                    if self.phase != .idle && self.phase != .matchResult {
+                        self.roundTimer.stop()
+                        self.countdownTimer?.cancel()
+                        self.phase = .idle
                     }
                 }
             }
             .store(in: &cancellables)
     }
 
-    // MARK: - Sync
-
-    /// HOST broadcasts the full authoritative state to all peers.
-    private func syncState() {
-        guard isHost else { return }
-        broadcast(.stateSync(state))
-    }
+    // MARK: - Broadcast
 
     private func broadcast(_ payload: GameMessage.Payload) {
         let message = GameMessage(senderName: session.localPeerID.displayName, payload: payload)

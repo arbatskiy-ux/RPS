@@ -3,32 +3,69 @@ import SwiftUI
 struct ResultsView: View {
     @EnvironmentObject private var appState: AppState
 
-    private var sortedScores: [(name: String, score: Int)] {
-        appState.gameEngine.state.scores
-            .map { (name: $0.key, score: $0.value) }
-            .sorted { $0.score > $1.score }
+    private var state: GameState { appState.gameEngine.state }
+    private var isHost: Bool { appState.gameEngine.isHost }
+
+    private var localName: String {
+        isHost ? state.hostName : state.guestName
+    }
+
+    private var didWin: Bool {
+        state.matchWinner == localName
     }
 
     var body: some View {
-        VStack(spacing: 24) {
-            Text("Game Over!")
-                .font(.largeTitle.bold())
-
+        VStack(spacing: 32) {
+            // Trophy / result header
             VStack(spacing: 12) {
-                ForEach(Array(sortedScores.enumerated()), id: \.element.name) { index, entry in
+                Text(didWin ? "🏆" : "😔")
+                    .font(.system(size: 80))
+                Text(didWin ? "You Won the Match!" : "You Lost the Match")
+                    .font(.largeTitle.bold())
+                Text("\(state.hostName) \(state.hostWins) – \(state.guestWins) \(state.guestName)")
+                    .font(.title2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            // Round-by-round breakdown
+            VStack(spacing: 8) {
+                Text("Round History")
+                    .font(.headline)
+
+                ForEach(Array(state.roundResults.enumerated()), id: \.offset) { index, result in
                     HStack {
-                        Text(medal(for: index))
-                            .font(.title2)
-                        Text(entry.name)
-                            .font(.headline)
+                        Text("Round \(result.round)")
+                            .font(.subheadline)
+                            .frame(width: 70, alignment: .leading)
+
                         Spacer()
-                        Text("\(entry.score) pts")
-                            .font(.title3.monospacedDigit())
+
+                        Text(result.hostChoice.symbol)
+                            .font(.title2)
+                        Text("vs")
+                            .font(.caption)
                             .foregroundStyle(.secondary)
+                        Text(result.guestChoice.symbol)
+                            .font(.title2)
+
+                        Spacer()
+
+                        if let winner = result.winnerName {
+                            Text(winner == localName ? "Win" : "Loss")
+                                .font(.caption.bold())
+                                .foregroundStyle(winner == localName ? .green : .red)
+                                .frame(width: 40)
+                        } else {
+                            Text("Draw")
+                                .font(.caption.bold())
+                                .foregroundStyle(.yellow)
+                                .frame(width: 40)
+                        }
                     }
-                    .padding()
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 12)
                     .background(Color(.secondarySystemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
 
@@ -37,14 +74,5 @@ struct ResultsView: View {
                 .font(.footnote)
         }
         .padding()
-    }
-
-    private func medal(for index: Int) -> String {
-        switch index {
-        case 0: return "🥇"
-        case 1: return "🥈"
-        case 2: return "🥉"
-        default: return "  "
-        }
     }
 }

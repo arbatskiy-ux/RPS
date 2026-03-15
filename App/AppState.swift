@@ -38,9 +38,9 @@ final class AppState: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] phase in
                 switch phase {
-                case .playing, .countdown, .movePause:
+                case .countdown, .choosing, .reveal:
                     self?.currentScreen = .game
-                case .results:
+                case .matchResult:
                     self?.currentScreen = .results
                 case .idle:
                     self?.currentScreen = .lobby
