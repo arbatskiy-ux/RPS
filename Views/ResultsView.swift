@@ -69,9 +69,29 @@ struct ResultsView: View {
                 }
             }
 
-            Text("Returning to lobby...")
-                .foregroundStyle(.secondary)
-                .font(.footnote)
+            // Rematch / disconnect buttons
+            if appState.session.isConnected {
+                VStack(spacing: 12) {
+                    if appState.gameEngine.isHost {
+                        ActionButton(title: "Play Again", style: .primary) {
+                            appState.gameEngine.startGame(shakeMode: state.isShakeModeEnabled)
+                        }
+                    } else {
+                        Text("Waiting for host to start...")
+                            .foregroundStyle(.secondary)
+                            .font(.subheadline)
+                    }
+
+                    ActionButton(title: "Back to Home", style: .secondary) {
+                        appState.gameEngine.endGame()
+                        appState.goToHome()
+                    }
+                }
+            } else {
+                ActionButton(title: "Back to Home", style: .secondary) {
+                    appState.goToHome()
+                }
+            }
         }
         .padding()
     }

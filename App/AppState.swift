@@ -17,6 +17,7 @@ final class AppState: ObservableObject {
     let gameEngine: GameEngine
     let hapticManager: HapticManager
     let motionManager: MotionManager
+    let audioManager: AudioManager
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -24,12 +25,14 @@ final class AppState: ObservableObject {
         let session = MultipeerSession(displayName: UIDevice.current.name)
         let hapticManager = HapticManager()
         let motionManager = MotionManager()
-        let gameEngine = GameEngine(session: session, hapticManager: hapticManager)
+        let audioManager = AudioManager()
+        let gameEngine = GameEngine(session: session, hapticManager: hapticManager, audioManager: audioManager)
 
         self.session = session
         self.gameEngine = gameEngine
         self.hapticManager = hapticManager
         self.motionManager = motionManager
+        self.audioManager = audioManager
 
         bindGameEngine()
     }

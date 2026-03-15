@@ -19,6 +19,7 @@ final class GameEngine: ObservableObject {
 
     private let session: MultipeerSession
     let hapticManager: HapticManager
+    private let audioManager: AudioManager
     private var cancellables = Set<AnyCancellable>()
     private var countdownTimer: AnyCancellable?
 
@@ -32,9 +33,10 @@ final class GameEngine: ObservableObject {
 
     var isHost: Bool { session.isHost }
 
-    init(session: MultipeerSession, hapticManager: HapticManager) {
+    init(session: MultipeerSession, hapticManager: HapticManager, audioManager: AudioManager = AudioManager()) {
         self.session = session
         self.hapticManager = hapticManager
+        self.audioManager = audioManager
         subscribeToNetwork()
         subscribeToChoiceTimer()
         subscribeToDisconnect()
@@ -206,9 +208,6 @@ final class GameEngine: ObservableObject {
             } else {
                 hapticManager.playLoserFeedback()
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
-                self?.phase = .idle
-            }
         } else {
             // If draw, don't advance round number
             if result.winnerName != nil {
@@ -244,6 +243,7 @@ final class GameEngine: ObservableObject {
         phase = .countdown(3)
         localChoice = nil
         hapticManager.playCountdownPulse()
+        audioManager.playCountdownSound(tick: 3)
         broadcast(.roundCountdown(3))
 
         var remaining = 3
@@ -257,6 +257,7 @@ final class GameEngine: ObservableObject {
                     self?.phase = .countdown(remaining)
                     self?.broadcast(.roundCountdown(remaining))
                     self?.hapticManager.playCountdownPulse()
+                    self?.audioManager.playCountdownSound(tick: remaining)
                 } else {
                     self?.countdownTimer?.cancel()
                     completion()
@@ -292,6 +293,7 @@ final class GameEngine: ObservableObject {
                 phase = .countdown(value)
                 localChoice = nil
                 hapticManager.playCountdownPulse()
+                audioManager.playCountdownSound(tick: value)
             }
 
         case .startChoosing:
@@ -317,9 +319,6 @@ final class GameEngine: ObservableObject {
                     hapticManager.playWinnerFeedback()
                 } else {
                     hapticManager.playLoserFeedback()
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
-                    self?.phase = .idle
                 }
             }
 
