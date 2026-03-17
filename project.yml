@@ -3,12 +3,18 @@ options:
   bundleIdPrefix: com.arbatskiy
   deploymentTarget:
     iOS: "16.0"
-  xcodeVersion: "15.0"
+  xcodeVersion: "16.0"
+  defaultConfig: Debug
+
+configs:
+  Debug: debug
+  Release: release
 
 targets:
   RPS:
     type: application
     platform: iOS
+    deploymentTarget: "16.0"
     sources:
       - path: App
       - path: Views
@@ -18,17 +24,21 @@ targets:
     resources:
       - path: Assets.xcassets
       - path: Sounds
-      - path: Info.plist
     info:
       path: Info.plist
       properties:
+        UILaunchScreen: {}
         NSLocalNetworkUsageDescription: "Used to connect with nearby players"
         NSBonjourServices:
           - "_rps-game._tcp"
           - "_rps-game._udp"
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.arbatskiy.rps
-      MARKETING_VERSION: "1.0.0"
-      CURRENT_PROJECT_VERSION: 1
-      SWIFT_VERSION: "5.9"
-      INFOPLIST_FILE: Info.plist
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.arbatskiy.rps
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "5.9"
+        IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
