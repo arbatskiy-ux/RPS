@@ -31,7 +31,10 @@ final class GameEngine: ObservableObject {
     private var hostShakeReady = false
     private var guestShakeReady = false
 
-    var isHost: Bool { session.isHost }
+    /// True when playing against CPU (no network).
+    private(set) var isSoloMode: Bool = false
+
+    var isHost: Bool { isSoloMode || session.isHost }
 
     init(session: MultipeerSession, hapticManager: HapticManager, audioManager: AudioManager = AudioManager()) {
         self.session = session
@@ -62,6 +65,15 @@ final class GameEngine: ObservableObject {
         }
     }
 
+    /// Solo mode: start a game against CPU without network.
+    func startSoloGame(playerName: String) {
+        isSoloMode = true
+        state = GameState()
+        state.hostName = playerName
+        state.guestName = "CPU"
+        startRound()
+    }
+
     /// Both: player picks Rock, Paper, or Scissors.
     func choose(_ choice: RPSChoice) {
         guard phase == .choosing, localChoice == nil else { return }
@@ -70,6 +82,10 @@ final class GameEngine: ObservableObject {
 
         if isHost {
             hostChoice = choice
+            if isSoloMode {
+                // CPU picks immediately
+                guestChoice = RPSChoice.secureRandom()
+            }
             tryResolveRound()
         } else {
             broadcast(.playerChoice(choice))
@@ -80,10 +96,11 @@ final class GameEngine: ObservableObject {
     func endGame() {
         roundTimer.stop()
         countdownTimer?.cancel()
-        phase = .idle
-        if isHost {
+        if isHost && !isSoloMode {
             broadcast(.matchEnded(state))
         }
+        isSoloMode = false
+        phase = .idle
     }
 
     /// Called by shake mode when the local player has completed 3 shakes.

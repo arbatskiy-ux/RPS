@@ -1,11 +1,13 @@
 import SwiftUI
 import MultipeerConnectivity
 
-/// Connection Screen — shows nearby players and connection status.
-/// HOST can start a normal game or shake mode game.
 struct ConnectionView: View {
     @EnvironmentObject private var appState: AppState
     @State private var shakeMode = false
+
+    private var canStart: Bool {
+        appState.session.isHost && !appState.session.connectedPeers.isEmpty
+    }
 
     var body: some View {
         NavigationStack {
@@ -18,11 +20,9 @@ struct ConnectionView: View {
 
                 Spacer()
 
-                connectionButtons
-
-                if appState.session.isHost && appState.session.isConnected {
+                // Start Game — visible as soon as host has 1+ peer
+                if canStart {
                     VStack(spacing: 12) {
-                        // Shake mode toggle
                         Toggle(isOn: $shakeMode) {
                             HStack {
                                 Image(systemName: "iphone.radiowaves.left.and.right")
@@ -38,6 +38,8 @@ struct ConnectionView: View {
                         }
                     }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else {
+                    connectionButtons
                 }
             }
             .padding()
@@ -49,7 +51,7 @@ struct ConnectionView: View {
                     }
                 }
             }
-            .animation(.easeInOut, value: appState.session.isConnected)
+            .animation(.easeInOut, value: canStart)
             .animation(.easeInOut, value: appState.session.role)
         }
     }
@@ -64,7 +66,7 @@ struct ConnectionView: View {
                     .font(.subheadline.bold())
                     .foregroundStyle(role == .host ? .orange : .blue)
 
-                if !appState.session.isConnected {
+                if appState.session.connectedPeers.isEmpty {
                     ProgressView()
                         .controlSize(.small)
                         .padding(.leading, 4)
@@ -89,12 +91,11 @@ struct ConnectionView: View {
                 ActionButton(title: "Host Game", style: .primary) {
                     appState.session.startHosting()
                 }
-
                 ActionButton(title: "Join Game", style: .secondary) {
                     appState.session.startBrowsing()
                 }
             }
-        } else if !appState.session.isConnected {
+        } else if appState.session.connectedPeers.isEmpty {
             ActionButton(title: "Cancel", style: .secondary) {
                 appState.session.disconnect()
             }

@@ -64,6 +64,12 @@ final class AppState: ObservableObject {
 
     func goToHome() {
         session.disconnect()
+        gameEngine.endGame()
         currentScreen = .home
+    }
+
+    /// Start a solo game against CPU (no network needed).
+    func startSoloGame() {
+        gameEngine.startSoloGame(playerName: playerName)
     }
 }

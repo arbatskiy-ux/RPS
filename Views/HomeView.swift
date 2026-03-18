@@ -34,6 +34,11 @@ struct HomeView: View {
                     appState.goToConnection()
                 }
 
+                // Solo mode — play against CPU
+                ActionButton(title: "Solo Practice", style: .secondary) {
+                    appState.startSoloGame()
+                }
+
                 Spacer()
             }
             .padding()
