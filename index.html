@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>RPS — все экраны</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
+  body { background: #1a1a2e; padding: 40px 20px; }
+  h1 { color: #fff; text-align: center; margin-bottom: 40px; font-size: 22px; letter-spacing: 2px; opacity: 0.5; }
+  .screens { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; }
+
+  /* iPhone frame */
+  .phone { width: 240px; flex-shrink: 0; }
+  .phone-label { color: #888; font-size: 12px; text-align: center; margin-bottom: 10px; letter-spacing: 1px; text-transform: uppercase; }
+  .frame {
+    width: 240px; height: 520px;
+    background: #000;
+    border-radius: 44px;
+    border: 6px solid #333;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 80px; height: 22px;
+    background: #000; border-radius: 0 0 16px 16px;
+    z-index: 10;
+  }
+  .screen { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; }
+
+  /* ── HOME ── */
+  .home { background: #fff; justify-content: space-between; padding: 50px 20px 40px; }
+  .home .logo-icon { font-size: 60px; text-align: center; }
+  .home .title { font-size: 32px; font-weight: 800; color: #000; text-align: center; }
+  .home .subtitle { font-size: 13px; color: #888; text-align: center; margin-top: 4px; }
+  .home .name-field {
+    width: 100%; background: #f2f2f7; border-radius: 10px;
+    padding: 10px 14px; font-size: 13px; color: #333;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .home .btns { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+  .btn-primary { background: #007aff; color: #fff; border-radius: 12px; padding: 13px; text-align: center; font-size: 14px; font-weight: 600; }
+  .btn-secondary { background: #f2f2f7; color: #000; border-radius: 12px; padding: 13px; text-align: center; font-size: 14px; font-weight: 600; }
+
+  /* ── CONNECTION ── */
+  .connection { background: #fff; padding: 50px 20px 30px; gap: 16px; }
+  .nav-title { font-size: 20px; font-weight: 700; color: #000; align-self: flex-start; margin-top: 8px; }
+  .role-badge {
+    width: 100%; padding: 8px 12px; border-radius: 10px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 600;
+  }
+  .role-host { background: rgba(255,149,0,0.1); color: #ff9500; }
+  .role-guest { background: rgba(0,122,255,0.1); color: #007aff; }
+  .peer-list { width: 100%; }
+  .peer-list .section-title { font-size: 14px; font-weight: 700; color: #000; margin-bottom: 8px; }
+  .peer-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; }
+  .dot-green { width: 8px; height: 8px; border-radius: 50%; background: #34c759; margin-left: auto; }
+
+  /* ── GAME COUNTDOWN ── */
+  .game-dark { background: #000; padding: 50px 16px 30px; justify-content: space-between; }
+  .score-bar { display: flex; align-items: center; gap: 12px; align-self: stretch; justify-content: center; }
+  .score-pill {
+    background: rgba(255,255,255,0.1); border-radius: 10px;
+    padding: 6px 12px; text-align: center; backdrop-filter: blur(8px);
+  }
+  .score-pill .name { font-size: 10px; font-weight: 700; color: #ffd60a; }
+  .score-pill .num { font-size: 20px; font-weight: 800; color: #fff; }
+  .score-vs { color: rgba(255,255,255,0.4); font-size: 13px; font-weight: 600; }
+  .countdown-label { font-size: 36px; font-weight: 800; color: #fff; text-align: center; }
+  .countdown-num { font-size: 90px; font-weight: 800; color: rgba(255,255,255,0.3); line-height: 1; text-align: center; }
+  .round-label { font-size: 13px; color: rgba(255,255,255,0.5); text-align: center; }
+
+  /* ── GAME CHOOSING ── */
+  .choose-prompt { font-size: 22px; font-weight: 700; color: #fff; text-align: center; }
+  .timer-num { font-size: 32px; font-weight: 800; color: rgba(255,255,255,0.8); text-align: center; }
+  .choice-btns { display: flex; gap: 12px; justify-content: center; padding-bottom: 10px; }
+  .choice-btn {
+    width: 64px; height: 64px; background: rgba(255,255,255,0.1);
+    border-radius: 14px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 3px;
+  }
+  .choice-btn .emoji { font-size: 28px; }
+  .choice-btn .lbl { font-size: 9px; color: #fff; font-weight: 600; }
+
+  /* ── REVEAL ── */
+  .reveal-title { font-size: 13px; color: rgba(255,255,255,0.5); text-align: center; }
+  .moves-row { display: flex; align-items: center; gap: 20px; justify-content: center; }
+  .move-card { text-align: center; }
+  .move-card .emoji { font-size: 52px; }
+  .move-card .who { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 4px; }
+  .vs-text { font-size: 16px; color: rgba(255,255,255,0.3); font-weight: 700; }
+  .result-win { font-size: 28px; font-weight: 800; color: #34c759; text-align: center; }
+  .result-lose { font-size: 28px; font-weight: 800; color: #ff3b30; text-align: center; }
+  .result-draw { font-size: 28px; font-weight: 800; color: #ffd60a; text-align: center; }
+
+  /* ── RESULTS ── */
+  .results { background: #fff; padding: 50px 16px 30px; gap: 12px; }
+  .trophy { font-size: 52px; text-align: center; }
+  .result-headline { font-size: 20px; font-weight: 800; text-align: center; color: #000; }
+  .result-score { font-size: 14px; color: #888; text-align: center; }
+  .history { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+  .history-title { font-size: 14px; font-weight: 700; color: #000; }
+  .history-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 10px; background: #f2f2f7; border-radius: 8px; font-size: 12px;
+  }
+  .history-round { color: #888; }
+  .history-moves { display: flex; align-items: center; gap: 4px; font-size: 18px; }
+  .history-outcome-win { color: #34c759; font-weight: 700; }
+  .history-outcome-lose { color: #ff3b30; font-weight: 700; }
+  .returning { font-size: 11px; color: #aaa; text-align: center; }
+</style>
+</head>
+<body>
+<h1>RPS — ALL SCREENS</h1>
+<div class="screens">
+
+  <!-- HOME -->
+  <div class="phone">
+    <div class="phone-label">Home</div>
+    <div class="frame">
+      <div class="notch"></div>
+      <div class="screen home">
+        <div>
+          <div class="logo-icon">✊✋✌️</div>
+          <div class="title">RPS</div>
+          <div class="subtitle">Rock • Paper • Scissors</div>
+        </div>
+        <div style="width:100%;display:flex;flex-direction:column;gap:14px;">
+          <div class="name-field">👤 &nbsp;iPhone</div>
+          <div class="btns">
+            <div class="btn-primary">Find Player</div>
+            <div class="btn-secondary">Solo Practice</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONNECTION -->
+  <div class="phone">
+    <div class="phone-label">Connection</div>
+    <div class="frame">
+      <div class="notch"></div>
+      <div class="screen connection">
+        <div class="nav-title">Connection</div>
+        <div class="role-badge role-host">👑 &nbsp;You are the HOST</div>
+        <div style="height:1px;background:#eee;width:100%;"></div>
+        <div class="peer-list">
+          <div class="section-title">Players (2)</div>
+          <div class="peer-row">👑 <span>iPhone 17 Pro</span> <span style="color:#888;font-size:11px">(You)</span></div>
+          <div class="peer-row">👤 <span>iPhone</span> <div class="dot-green"></div></div>
+        </div>
+        <div style="flex:1"></div>
+        <div style="width:100%;display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:0 4px;font-size:13px;">
+            <span>📳 Shake Mode</span>
+            <div style="width:40px;height:22px;background:#eee;border-radius:11px;"></div>
+          </div>
+          <div class="btn-primary">Start Game</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COUNTDOWN -->
+  <div class="phone">
+    <div class="phone-label">Countdown</div>
+    <div class="frame">
+      <div class="notch"></div>
+      <div class="screen game-dark">
+        <div class="score-bar">
+          <div class="score-pill"><div class="name">You</div><div class="num">0</div></div>
+          <div class="score-vs">vs</div>
+          <div class="score-pill"><div class="name" style="color:#fff">CPU</div><div class="num">0</div></div>
+        </div>
+        <div>
+          <div class="round-label">Round 1</div>
+          <div class="countdown-label">Rock...</div>
+          <div class="countdown-num">3</div>
+        </div>
+        <div style="height:40px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHOOSING -->
+  <div class="phone">
+    <div class="phone-label">Choose Move</div>
+    <div class="frame">
+      <div class="notch"></div>
+      <div class="screen game-dark">
+        <div class="score-bar">
+          <div class="score-pill"><div class="name">You</div><div class="num">0</div></div>
+          <div class="score-vs">vs</div>
+          <div class="score-pill"><div class="name" style="color:#fff">CPU</div><div class="num">0</div></div>
+        </div>
+        <div>
+          <div class="round-label">Round 1</div>
+          <div class="choose-prompt">Choose your move!</div>
+          <div class="timer-num" style="margin-top:8px">5</div>
+        </div>
+        <div class="choice-btns">
+          <div class="choice-btn"><div class="emoji">✊</div><div class="lbl">Rock</div></div>
+          <div class="choice-btn"><div class="emoji">✋</div><div class="lbl">Paper</div></div>
+          <div class="choice-btn"><div class="emoji">✌️</div><div class="lbl">Scissors</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REVEAL WIN -->
+  <div class="phone">
+    <div class="phone-label">Reveal — Win</div>
+    <div class="frame">
+      <div class="notch"></div>
+      <div class="screen game-dark">
+        <div class="score-bar">
+          <div class="score-pill"><div class="name">You</div><div class="num">1</div></div>
+          <div class="score-vs">vs</div>
+          <div class="score-pill"><div class="name" style="color:#fff">CPU</div><div class="num">0</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px;align-items:center;">
+          <div class="reveal-title">Round 1</div>
+          <div class="moves-row">
+            <div class="move-card"><div class="emoji">✊</div><div class="who">You</div></div>
+            <div class="vs-text">vs</div>
+            <div class="move-card"><div class="emoji">✌️</div><div class="who">CPU</div></div>
+          </div>
+          <div class="result-win">You Win! 🎉</div>
+        </div>
+        <div style="height:40px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REVEAL LOSE -->
+  <div class="phone">
+    <div class="phone-label">Reveal — Lose</div>
+    <div class="frame">
+      <div class="notch"></div>
+      <div class="screen game-dark">
+        <div class="score-bar">
+          <div class="score-pill"><div class="name">You</div><div class="num">0</div></div>
+          <div class="score-vs">vs</div>
+          <div class="score-pill"><div class="name" style="color:#fff">CPU</div><div class="num">1</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px;align-items:center;">
+          <div class="reveal-title">Round 1</div>
+          <div class="moves-row">
+            <div class="move-card"><div class="emoji">✌️</div><div class="who">You</div></div>
+            <div class="vs-text">vs</div>
+            <div class="move-card"><div class="emoji">✊</div><div class="who">CPU</div></div>
+          </div>
+          <div class="result-lose">You Lose!</div>
+        </div>
+        <div style="height:40px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="phone">
+    <div class="phone-label">Results — Win</div>
+    <div class="frame">
+      <div class="notch"></div>
+      <div class="screen results">
+        <div class="trophy">🏆</div>
+        <div class="result-headline">You Won the Match!</div>
+        <div class="result-score">You 2 — 0 CPU</div>
+        <div class="history">
+          <div class="history-title">Round History</div>
+          <div class="history-row">
+            <span class="history-round">Round 1</span>
+            <div class="history-moves">✊<span style="font-size:10px;color:#888">vs</span>✌️</div>
+            <span class="history-outcome-win">Win</span>
+          </div>
+          <div class="history-row">
+            <span class="history-round">Round 2</span>
+            <div class="history-moves">✋<span style="font-size:10px;color:#888">vs</span>✊</div>
+            <span class="history-outcome-win">Win</span>
+          </div>
+        </div>
+        <div class="returning">Returning to lobby...</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
