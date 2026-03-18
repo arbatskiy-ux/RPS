@@ -34,6 +34,9 @@ final class GameEngine: ObservableObject {
     /// True when playing against CPU (no network).
     private(set) var isSoloMode: Bool = false
 
+    /// Used by Previews only to inject a custom state.
+    var previewState: GameState? { didSet { if let s = previewState { state = s } } }
+
     var isHost: Bool { isSoloMode || session.isHost }
 
     init(session: MultipeerSession, hapticManager: HapticManager, audioManager: AudioManager = AudioManager()) {
