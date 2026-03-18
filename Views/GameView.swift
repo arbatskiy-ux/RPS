@@ -132,7 +132,7 @@ struct ShakeModeView: View {
             Image(systemName: "iphone.radiowaves.left.and.right")
                 .font(.system(size: 60))
                 .foregroundStyle(.orange)
-                .symbolEffect(.pulse, isActive: true)
+                .opacity(0.8)
 
             Text("Shake to Start!")
                 .font(.title.bold())
