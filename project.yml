@@ -42,6 +42,7 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         REQUIRES_FULL_SCREEN: YES
         CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: HXUSK3HF54
 
 schemes:
   RPS:
