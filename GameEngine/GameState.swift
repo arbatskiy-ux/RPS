@@ -80,7 +80,7 @@ struct GameState: Codable, Equatable {
     var hostName: String = ""
     var guestName: String = ""
     var currentRound: Int = 1
-    let roundsToWin: Int = 2     // first to 2 wins (best of 3)
+    var roundsToWin: Int = 2     // first to 2 wins (best of 3)
     var hostWins: Int = 0
     var guestWins: Int = 0
     var roundResults: [RoundResult] = []
