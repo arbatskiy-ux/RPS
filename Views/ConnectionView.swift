@@ -5,100 +5,197 @@ struct ConnectionView: View {
     @EnvironmentObject private var appState: AppState
     @State private var shakeMode = false
 
-    private var canStart: Bool {
-        appState.session.isHost && !appState.session.connectedPeers.isEmpty
+    private var hasOpponent: Bool {
+        !appState.session.connectedPeers.isEmpty
+    }
+
+    /// Only the HOST can start the game.
+    private var canStartGame: Bool {
+        appState.session.isHost && hasOpponent
+    }
+
+    /// The opponent's custom player name (or device name as fallback).
+    private var opponentName: String? {
+        guard let peer = appState.session.connectedPeers.first else { return nil }
+        return appState.session.peerDisplayNames[peer] ?? peer.displayName
     }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
-                roleIndicator
+            VStack(spacing: 0) {
 
-                Divider()
+                // ── Search / Opponent area ──────────────────────────────────
+                VStack(spacing: 20) {
+                    Spacer().frame(height: 32)
 
-                PeerListView(session: appState.session)
+                    if hasOpponent {
+                        opponentCard
+                    } else {
+                        searchingView
+                    }
 
-                Spacer()
+                    if !hasOpponent {
+                        Label(
+                            "Попросите соперника включить Wi-Fi для участия в игре",
+                            systemImage: "wifi"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                    }
 
-                // Start Game — visible as soon as host has 1+ peer
-                if canStart {
-                    VStack(spacing: 12) {
-                        Toggle(isOn: $shakeMode) {
-                            HStack {
-                                Image(systemName: "iphone.radiowaves.left.and.right")
-                                Text("Shake Mode")
-                                    .font(.subheadline)
-                            }
-                        }
-                        .tint(.orange)
-                        .padding(.horizontal)
+                    Spacer()
+                }
 
-                        ActionButton(title: "Start Game", style: .primary) {
-                            appState.gameEngine.startGame(shakeMode: shakeMode)
+                // ── Settings & actions ─────────────────────────────────────
+                VStack(spacing: 16) {
+                    Divider()
+
+                    // Режим тряски
+                    Toggle(isOn: $shakeMode) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "iphone.radiowaves.left.and.right")
+                                .foregroundStyle(.orange)
+                            Text("Режим тряски")
+                                .font(.subheadline)
                         }
                     }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                } else {
-                    connectionButtons
+                    .tint(.orange)
+                    .padding(.horizontal)
+
+                    // Слайдер раундов
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Раундов")
+                                .font(.subheadline)
+                            Spacer()
+                            Text("\(appState.roundCount)")
+                                .font(.subheadline.bold())
+                                .monospacedDigit()
+                                .foregroundStyle(.primary)
+                        }
+                        .padding(.horizontal)
+
+                        Slider(
+                            value: Binding(
+                                get: { Double(appState.roundCount) },
+                                set: { appState.roundCount = Int($0) }
+                            ),
+                            in: 3...10,
+                            step: 1
+                        )
+                        .tint(.blue)
+                        .padding(.horizontal)
+
+                        HStack {
+                            Text("3")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("10")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal)
+                    }
+
+                    // Кнопка действия
+                    Group {
+                        if hasOpponent {
+                            if canStartGame {
+                                ActionButton(title: "Начать турнир 🏆", style: .primary) {
+                                    appState.gameEngine.startGame(
+                                        shakeMode: shakeMode,
+                                        roundCount: appState.roundCount
+                                    )
+                                }
+                            } else {
+                                // GUEST ждёт, пока хост запустит игру
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                    Text("Ожидание хоста...")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color(.secondarySystemBackground))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                        } else {
+                            ActionButton(title: "Играть одному", style: .secondary) {
+                                appState.startSoloGame()
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 24)
                 }
             }
-            .padding()
-            .navigationTitle("Connection")
+            .navigationTitle("Соперники")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Back") {
+                    Button("Назад") {
                         appState.goToHome()
                     }
                 }
             }
-            .animation(.easeInOut, value: canStart)
-            .animation(.easeInOut, value: appState.session.role)
+            .animation(.easeInOut(duration: 0.3), value: hasOpponent)
+            .animation(.easeInOut(duration: 0.3), value: canStartGame)
+            .onAppear {
+                // Restart searching if not already connected or searching
+                if !appState.session.isConnected && appState.session.role == nil {
+                    let name = appState.playerName.isEmpty
+                        ? UIDevice.current.name
+                        : appState.playerName
+                    appState.session.startAutoConnect(playerName: name)
+                }
+            }
         }
     }
 
-    @ViewBuilder
-    private var roleIndicator: some View {
-        if let role = appState.session.role {
-            HStack {
-                Image(systemName: role == .host ? "crown.fill" : "person.fill")
-                    .foregroundStyle(role == .host ? .orange : .blue)
-                Text(role == .host ? "You are the HOST" : "You are a GUEST")
-                    .font(.subheadline.bold())
-                    .foregroundStyle(role == .host ? .orange : .blue)
+    // MARK: - Subviews
 
-                if appState.session.connectedPeers.isEmpty {
-                    ProgressView()
-                        .controlSize(.small)
-                        .padding(.leading, 4)
-                    Text(role == .host ? "Waiting for players..." : "Searching for host...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill((role == .host ? Color.orange : Color.blue).opacity(0.1))
-            )
+    private var searchingView: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .controlSize(.large)
+                .tint(.blue)
+                .scaleEffect(1.4)
+
+            Text("Поиск соперников...")
+                .font(.headline)
+                .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
     }
 
-    @ViewBuilder
-    private var connectionButtons: some View {
-        if appState.session.role == nil {
-            HStack(spacing: 16) {
-                ActionButton(title: "Host Game", style: .primary) {
-                    appState.session.startHosting()
-                }
-                ActionButton(title: "Join Game", style: .secondary) {
-                    appState.session.startBrowsing()
-                }
-            }
-        } else if appState.session.connectedPeers.isEmpty {
-            ActionButton(title: "Cancel", style: .secondary) {
-                appState.session.disconnect()
+    private var opponentCard: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "person.circle.fill")
+                .font(.system(size: 64))
+                .foregroundStyle(.blue)
+
+            Text(opponentName ?? "Соперник")
+                .font(.title2.bold())
+
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(.green)
+                    .frame(width: 8, height: 8)
+                Text("Подключён")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal)
     }
 }

@@ -51,12 +51,22 @@ final class GameEngine: ObservableObject {
     // MARK: - Public API
 
     /// HOST only: begins the match.
-    func startGame(shakeMode: Bool = false) {
+    /// - Parameters:
+    ///   - shakeMode: enable shake-to-start mode
+    ///   - roundCount: total rounds (3–10); roundsToWin = roundCount / 2 + 1
+    func startGame(shakeMode: Bool = false, roundCount: Int = 3) {
         guard isHost, !session.connectedPeers.isEmpty else { return }
 
         state = GameState()
-        state.hostName = session.localPeerID.displayName
-        state.guestName = session.connectedPeers.first?.displayName ?? "Guest"
+        // Use custom player name if set, otherwise fall back to device name
+        state.hostName  = session.localPlayerName.isEmpty
+            ? session.localPeerID.displayName
+            : session.localPlayerName
+        state.guestName = session.connectedPeers.first
+            .flatMap { session.peerDisplayNames[$0] }
+            ?? session.connectedPeers.first?.displayName
+            ?? "Гость"
+        state.roundsToWin      = max(1, roundCount / 2 + 1)
         state.isShakeModeEnabled = shakeMode
 
         broadcast(.gameStarted(state))
@@ -69,11 +79,12 @@ final class GameEngine: ObservableObject {
     }
 
     /// Solo mode: start a game against CPU without network.
-    func startSoloGame(playerName: String) {
+    func startSoloGame(playerName: String, roundCount: Int = 3) {
         isSoloMode = true
         state = GameState()
-        state.hostName = playerName
-        state.guestName = "CPU"
+        state.hostName    = playerName
+        state.guestName   = "CPU"
+        state.roundsToWin = max(1, roundCount / 2 + 1)
         startRound()
     }
 
