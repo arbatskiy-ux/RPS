@@ -1,24 +1,41 @@
 import CoreMotion
 import Combine
+import UIKit
 
-/// Detects shake gestures via CoreMotion accelerometer.
-/// Supports both continuous shake detection and counted shake mode (N shakes to trigger).
+/// Detects shake gestures via CoreMotion accelerometer (real device)
+/// or UIKit motionBegan (Simulator fallback).
 final class MotionManager: ObservableObject {
     private let motionManager = CMMotionManager()
 
     @Published private(set) var shakeCount: Int = 0
 
     private var shakeHandler: (() -> Void)?
+    private var countedOnShake: (() -> Void)?
+    private var countedOnComplete: (() -> Void)?
+    private var countedTarget: Int = 0
+
     private var lastShakeTime: Date = .distantPast
     private let shakeThreshold: Double = 2.5
     private let updateInterval: TimeInterval = 0.05
-    private let shakeCooldown: TimeInterval = 0.4  // min time between counted shakes
+    private let shakeCooldown: TimeInterval = 0.4
+
+    // MARK: - Simulator detection
+
+    var isSimulator: Bool {
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        return false
+        #endif
+    }
 
     // MARK: - Continuous shake detection
 
     func startShakeDetection(handler: @escaping () -> Void) {
-        guard motionManager.isAccelerometerAvailable else { return }
         shakeHandler = handler
+        if isSimulator { return }  // simulator uses UIKit path
+
+        guard motionManager.isAccelerometerAvailable else { return }
         motionManager.accelerometerUpdateInterval = updateInterval
         motionManager.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
             guard let self, let data else { return }
@@ -32,19 +49,22 @@ final class MotionManager: ObservableObject {
     func stopShakeDetection() {
         motionManager.stopAccelerometerUpdates()
         shakeHandler = nil
+        countedOnShake = nil
+        countedOnComplete = nil
     }
 
-    // MARK: - Counted shake mode (shake N times to trigger)
+    // MARK: - Counted shake mode
 
-    /// Start listening for shakes that count toward a target.
-    /// Each valid shake (with cooldown) increments `shakeCount`.
-    /// When `shakeCount` reaches `target`, calls `onComplete`.
-    /// Each intermediate shake calls `onShake` for haptic feedback.
     func startCountedShakes(target: Int, onShake: @escaping () -> Void, onComplete: @escaping () -> Void) {
-        guard motionManager.isAccelerometerAvailable else { return }
         shakeCount = 0
         lastShakeTime = .distantPast
+        countedTarget = target
+        countedOnShake = onShake
+        countedOnComplete = onComplete
 
+        if isSimulator { return }  // simulator uses UIKit path
+
+        guard motionManager.isAccelerometerAvailable else { return }
         motionManager.accelerometerUpdateInterval = updateInterval
         motionManager.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
             guard let self, let data else { return }
@@ -53,13 +73,7 @@ final class MotionManager: ObservableObject {
 
             if magnitude > self.shakeThreshold && now.timeIntervalSince(self.lastShakeTime) > self.shakeCooldown {
                 self.lastShakeTime = now
-                self.shakeCount += 1
-                onShake()
-
-                if self.shakeCount >= target {
-                    self.stopShakeDetection()
-                    onComplete()
-                }
+                self.recordShake()
             }
         }
     }
@@ -68,7 +82,32 @@ final class MotionManager: ObservableObject {
         shakeCount = 0
     }
 
+    // MARK: - UIKit shake (Simulator: Device → Shake or ⌃⌘Z)
+
+    /// Call this from UIWindow.motionBegan — handles simulator shake events.
+    func handleUIKitShake() {
+        let now = Date()
+        guard now.timeIntervalSince(lastShakeTime) > shakeCooldown else { return }
+        lastShakeTime = now
+
+        if countedOnShake != nil || countedOnComplete != nil {
+            recordShake()
+        } else {
+            shakeHandler?()
+        }
+    }
+
     // MARK: - Private
+
+    private func recordShake() {
+        shakeCount += 1
+        countedOnShake?()
+
+        if shakeCount >= countedTarget {
+            stopShakeDetection()
+            countedOnComplete?()
+        }
+    }
 
     private func accelerationMagnitude(_ a: CMAcceleration) -> Double {
         sqrt(a.x * a.x + a.y * a.y + a.z * a.z)
