@@ -156,9 +156,10 @@ struct ShakeModeView: View {
             motionManager.startCountedShakes(
                 target: 3,
                 onShake: {
-                    engine.hapticManager.playShakePulse()
+                    engine.hapticManager.playShakePulse(shakeNumber: motionManager.shakeCount)
                 },
                 onComplete: {
+                    engine.hapticManager.playShakePulse(shakeNumber: 3)
                     engine.localPlayerShakeReady()
                 }
             )

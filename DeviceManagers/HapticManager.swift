@@ -58,9 +58,11 @@ final class HapticManager {
         play(events: events)
     }
 
-    /// Short haptic pulse for shake detection feedback.
-    func playShakePulse() {
-        playCustomImpact(intensity: 0.7, sharpness: 0.6)
+    /// Haptic pulse for shake detection. Intensity grows with shake count (1→2→3).
+    func playShakePulse(shakeNumber: Int = 1) {
+        let intensity = Float(min(0.5 + Double(shakeNumber) * 0.2, 1.0))
+        let sharpness = Float(min(0.4 + Double(shakeNumber) * 0.15, 0.9))
+        playCustomImpact(intensity: intensity, sharpness: sharpness)
     }
 
     // MARK: - Private
@@ -109,14 +111,22 @@ final class HapticManager {
 
     private func play(events: [CHHapticEvent]) {
         guard let engine else {
-            // Fallback: use UIKit for a basic buzz
-            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            // Fallback: UIKit must run on main thread
+            DispatchQueue.main.async {
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            }
             return
         }
         do {
             let pattern = try CHHapticPattern(events: events, parameters: [])
             let player = try engine.makePlayer(with: pattern)
             try player.start(atTime: CHHapticTimeImmediate)
-        } catch {}
+        } catch {
+            // Engine might have stopped — restart and retry once
+            try? engine.start()
+            DispatchQueue.main.async {
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            }
+        }
     }
 }
