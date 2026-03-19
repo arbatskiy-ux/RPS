@@ -22,10 +22,13 @@ final class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(roundCount, forKey: "roundCount") }
     }
 
-    /// Player avatar image data — persisted across app launches.
+    /// Local player avatar — persisted across app launches.
     @Published var avatarData: Data? {
         didSet { UserDefaults.standard.set(avatarData, forKey: "avatarData") }
     }
+
+    /// Opponent's avatar received over the network (not persisted).
+    @Published var opponentAvatarData: Data?
 
     let session: MultipeerSession
     let gameEngine: GameEngine
@@ -59,6 +62,7 @@ final class AppState: ObservableObject {
         self.audioManager   = audioManager
 
         bindGameEngine()
+        bindAvatarExchange()
     }
 
     private func bindGameEngine() {
@@ -79,6 +83,53 @@ final class AppState: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    // MARK: - Avatar Exchange
+
+    private func bindAvatarExchange() {
+        // Send our avatar when a peer connects
+        session.connectionEvent
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                if case .peerConnected = event {
+                    self?.sendAvatarToPeer()
+                }
+                if case .peerDisconnected = event {
+                    self?.opponentAvatarData = nil
+                }
+            }
+            .store(in: &cancellables)
+
+        // Receive opponent's avatar
+        session.receivedMessage
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] message in
+                if case .avatarData(let data) = message.payload {
+                    self?.opponentAvatarData = data
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    private func sendAvatarToPeer() {
+        guard let raw = avatarData,
+              let compressed = compressAvatar(raw) else { return }
+        let msg = GameMessage(
+            senderName: playerName,
+            payload: .avatarData(compressed)
+        )
+        session.send(message: msg)
+    }
+
+    /// Resize and compress avatar to small JPEG thumbnail for network transfer.
+    private func compressAvatar(_ data: Data, side: CGFloat = 80) -> Data? {
+        guard let image = UIImage(data: data) else { return nil }
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: side, height: side))
+        let thumb = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: CGSize(width: side, height: side)))
+        }
+        return thumb.jpegData(compressionQuality: 0.75)
     }
 
     func goToConnection() {

@@ -24,5 +24,8 @@ struct GameMessage: Codable {
         // Both directions: player input
         case playerChoice(RPSChoice)      // player picked rock/paper/scissors
         case playerShakeReady             // GUEST tells HOST they finished shaking
+
+        // Both directions: profile
+        case avatarData(Data)             // compressed avatar thumbnail (≤ 80×80px JPEG)
     }
 }

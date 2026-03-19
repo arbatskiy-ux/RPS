@@ -14,17 +14,43 @@ struct ResultsView: View {
         state.matchWinner == localName
     }
 
+    private var hostAvatarData: Data? {
+        isHost ? appState.avatarData : appState.opponentAvatarData
+    }
+
+    private var guestAvatarData: Data? {
+        isHost ? appState.opponentAvatarData : appState.avatarData
+    }
+
     var body: some View {
         VStack(spacing: 32) {
             // Trophy / result header
-            VStack(spacing: 12) {
+            VStack(spacing: 16) {
                 Text(didWin ? "🏆" : "😔")
                     .font(.system(size: 80))
-                Text(didWin ? "You Won the Match!" : "You Lost the Match")
+                Text(didWin ? "Вы победили!" : "Вы проиграли")
                     .font(.largeTitle.bold())
-                Text("\(state.hostName) \(state.hostWins) – \(state.guestWins) \(state.guestName)")
-                    .font(.title2.monospacedDigit())
-                    .foregroundStyle(.secondary)
+
+                // Score row with avatars
+                HStack(spacing: 20) {
+                    VStack(spacing: 6) {
+                        PlayerAvatar(name: state.hostName, imageData: hostAvatarData, size: 52)
+                        Text(state.hostName)
+                            .font(.caption.bold())
+                            .lineLimit(1)
+                    }
+
+                    Text("\(state.hostWins) – \(state.guestWins)")
+                        .font(.system(size: 36, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+
+                    VStack(spacing: 6) {
+                        PlayerAvatar(name: state.guestName, imageData: guestAvatarData, size: 52)
+                        Text(state.guestName)
+                            .font(.caption.bold())
+                            .lineLimit(1)
+                    }
+                }
             }
 
             // Round-by-round breakdown

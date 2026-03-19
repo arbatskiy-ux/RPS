@@ -22,17 +22,35 @@ struct GameView: View {
 
     // MARK: - Top Bar
 
+    private var hostAvatarData: Data? {
+        engine.isHost ? appState.avatarData : appState.opponentAvatarData
+    }
+
+    private var guestAvatarData: Data? {
+        engine.isHost ? appState.opponentAvatarData : appState.avatarData
+    }
+
     private var topBar: some View {
         HStack {
-            HStack(spacing: 16) {
-                PlayerScorePill(name: engine.state.hostName, wins: engine.state.hostWins, isLocal: engine.isHost)
+            HStack(spacing: 12) {
+                PlayerScorePill(
+                    name: engine.state.hostName,
+                    wins: engine.state.hostWins,
+                    isLocal: engine.isHost,
+                    avatarData: hostAvatarData
+                )
                 Text("vs")
                     .font(.headline)
                     .foregroundStyle(.white.opacity(0.5))
-                PlayerScorePill(name: engine.state.guestName, wins: engine.state.guestWins, isLocal: !engine.isHost)
+                PlayerScorePill(
+                    name: engine.state.guestName,
+                    wins: engine.state.guestWins,
+                    isLocal: !engine.isHost,
+                    avatarData: guestAvatarData
+                )
             }
             Spacer()
-            Button("Leave") {
+            Button("Выйти") {
                 engine.endGame()
                 appState.session.disconnect()
             }
@@ -176,21 +194,26 @@ struct PlayerScorePill: View {
     let name: String
     let wins: Int
     let isLocal: Bool
+    var avatarData: Data? = nil
 
     var body: some View {
-        VStack(spacing: 2) {
-            Text(name)
-                .font(.caption.bold())
-                .foregroundStyle(isLocal ? .yellow : .white)
-                .lineLimit(1)
-            Text("\(wins)")
-                .font(.title2.bold().monospacedDigit())
-                .foregroundStyle(.white)
+        HStack(spacing: 8) {
+            PlayerAvatar(name: name, imageData: avatarData, size: 32)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name)
+                    .font(.caption.bold())
+                    .foregroundStyle(isLocal ? .yellow : .white)
+                    .lineLimit(1)
+                Text("\(wins)")
+                    .font(.title2.bold().monospacedDigit())
+                    .foregroundStyle(.white)
+            }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
