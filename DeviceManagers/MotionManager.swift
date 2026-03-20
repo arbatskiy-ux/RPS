@@ -104,8 +104,9 @@ final class MotionManager: ObservableObject {
         countedOnShake?()
 
         if shakeCount >= countedTarget {
+            let completion = countedOnComplete
             stopShakeDetection()
-            countedOnComplete?()
+            completion?()
         }
     }
 

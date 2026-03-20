@@ -181,12 +181,23 @@ extension MultipeerSession: MCNearbyServiceBrowserDelegate {
         // Auto host/guest negotiation via device name comparison.
         // The device with the smaller name sends the invite → GUEST.
         // The device with the larger name waits → HOST (accepts invite).
-        let shouldInvite = localPeerID.displayName <= peerID.displayName
+        // When names are equal, fall back to hash comparison to break the tie.
+        let shouldInvite: Bool
+        if localPeerID.displayName == peerID.displayName {
+            shouldInvite = localPeerID.hash < peerID.hash
+        } else {
+            shouldInvite = localPeerID.displayName < peerID.displayName
+        }
+
         if shouldInvite {
             DispatchQueue.main.async { [weak self] in
                 self?.role = .guest
             }
-            browser.invitePeer(peerID, to: session, withContext: nil, timeout: 10)
+            // Small delay to let both devices finish discovery before connecting
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self, let browser = self.browser else { return }
+                browser.invitePeer(peerID, to: self.session, withContext: nil, timeout: 10)
+            }
         }
         // else: wait for the other device to invite us
     }

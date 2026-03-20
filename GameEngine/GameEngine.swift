@@ -380,6 +380,9 @@ final class GameEngine: ObservableObject {
                 guestShakeReady = true
                 tryStartAfterShakes()
             }
+
+        case .avatarData:
+            break // Handled by AppState
         }
     }
 

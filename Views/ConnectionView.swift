@@ -87,6 +87,9 @@ struct ConnectionView: View {
                         )
                         .tint(.blue)
                         .padding(.horizontal)
+                        .onChange(of: appState.roundCount) { _ in
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        }
 
                         HStack {
                             Text("3")
@@ -104,7 +107,7 @@ struct ConnectionView: View {
                     Group {
                         if hasOpponent {
                             if canStartGame {
-                                ActionButton(title: "Начать турнир 🏆", style: .primary) {
+                                ActionButton(title: "Начать турнир", style: .primary) {
                                     appState.gameEngine.startGame(
                                         shakeMode: shakeMode,
                                         roundCount: appState.roundCount
@@ -176,9 +179,11 @@ struct ConnectionView: View {
 
     private var opponentCard: some View {
         VStack(spacing: 10) {
-            Image(systemName: "person.circle.fill")
-                .font(.system(size: 64))
-                .foregroundStyle(.blue)
+            PlayerAvatar(
+                name: opponentName ?? "Соперник",
+                imageData: appState.opponentAvatarData,
+                size: 72
+            )
 
             Text(opponentName ?? "Соперник")
                 .font(.title2.bold())

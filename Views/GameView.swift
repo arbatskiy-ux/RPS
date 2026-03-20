@@ -144,17 +144,33 @@ struct GameView: View {
 struct ShakeModeView: View {
     @ObservedObject var motionManager: MotionManager
     @ObservedObject var engine: GameEngine
+    @State private var isPulsing = false
+    @State private var phoneOffset: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 24) {
             Image(systemName: "iphone.radiowaves.left.and.right")
                 .font(.system(size: 60))
                 .foregroundStyle(.orange)
-                .opacity(0.8)
+                .scaleEffect(isPulsing ? 1.15 : 1.0)
+                .offset(x: phoneOffset)
+                .animation(
+                    .easeInOut(duration: 0.12).repeatForever(autoreverses: true),
+                    value: phoneOffset
+                )
+                .animation(
+                    .easeInOut(duration: 1.2).repeatForever(autoreverses: true),
+                    value: isPulsing
+                )
 
-            Text("Shake to Start!")
+            Text("Встряхните телефон!")
                 .font(.title.bold())
                 .foregroundStyle(.white)
+                .opacity(isPulsing ? 1.0 : 0.6)
+                .animation(
+                    .easeInOut(duration: 1.2).repeatForever(autoreverses: true),
+                    value: isPulsing
+                )
 
             // Shake counter: 3 dots
             HStack(spacing: 16) {
@@ -162,7 +178,8 @@ struct ShakeModeView: View {
                     Circle()
                         .fill(index < motionManager.shakeCount ? Color.orange : Color.white.opacity(0.2))
                         .frame(width: 24, height: 24)
-                        .animation(.easeInOut(duration: 0.2), value: motionManager.shakeCount)
+                        .scaleEffect(index < motionManager.shakeCount ? 1.3 : 1.0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.5), value: motionManager.shakeCount)
                 }
             }
 
@@ -171,6 +188,8 @@ struct ShakeModeView: View {
                 .foregroundStyle(.white.opacity(0.6))
         }
         .onAppear {
+            isPulsing = true
+            phoneOffset = 6
             motionManager.startCountedShakes(
                 target: 3,
                 onShake: {
