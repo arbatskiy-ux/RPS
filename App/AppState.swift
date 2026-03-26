@@ -78,6 +78,7 @@ final class AppState: ObservableObject {
                 case .matchResult:
                     self?.currentScreen = .results
                 case .idle:
+                    guard self?.currentScreen != .onboarding else { return }
                     if self?.session.isConnected == true {
                         self?.currentScreen = .connection
                     } else {

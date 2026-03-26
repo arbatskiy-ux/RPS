@@ -78,6 +78,7 @@
 		19C1D9CE3D99BA674AE4AEB3 = {
 			isa = PBXGroup;
 			children = (
+				AA111111111111111111AAAA /* Assets.xcassets */,
 				F7D22ABF02CFCD19E51BB155 /* App */,
 				9111AC94195B827AD9ADDDE0 /* DeviceManagers */,
 				1B95C491426A4E0879AAE825 /* GameEngine */,
@@ -142,12 +143,33 @@
 		};
 /* End PBXGroup section */
 
+/* Begin PBXFileReference section (resources) */
+		AA111111111111111111AAAA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AA222222222222222222AAAA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section (resources) */
+
+/* Begin PBXBuildFile section (resources) */
+		AA333333333333333333AAAA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA111111111111111111AAAA /* Assets.xcassets */; };
+/* End PBXBuildFile section (resources) */
+
+/* Begin PBXResourcesBuildPhase section */
+		AA444444444444444444AAAA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA333333333333333333AAAA /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXNativeTarget section */
 		C9D1FDACA52E3AE2A2F94BF0 /* RPS */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C888DCD390596629D19DEE3C /* Build configuration list for PBXNativeTarget "RPS" */;
 			buildPhases = (
 				AE4C8F5D8B30E8D1FBAE11DF /* Sources */,
+				AA444444444444444444AAAA /* Resources */,
 			);
 			buildRules = (
 			);

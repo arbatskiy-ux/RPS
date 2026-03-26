@@ -26,26 +26,26 @@ private let onboardingPages: [OnboardingPage] = [
     ),
     OnboardingPage(
         title: "Paper",
-        description: "Looks soft, but wraps you up before you know it. Smooth operator with an iron grip disguised as a gentle touch.",
+        description: "The most dangerous and unpredictable type. He's fast, sharp, and a bit self-absorbed.",
         imageName: "paper",
-        feetImageName: nil,
+        feetImageName: "paper_feet",
         gradientColors: [],
         gradientStops: [
-            .init(color: Color(red: 0.85, green: 0.92, blue: 1.0), location: 0),
-            .init(color: Color(red: 0.55, green: 0.75, blue: 0.95), location: 0.47),
-            .init(color: Color(red: 0.15, green: 0.25, blue: 0.55), location: 1.0)
+            .init(color: Color(red: 0.97, green: 0.82, blue: 0.55), location: 0),
+            .init(color: Color(red: 0.96, green: 0.65, blue: 0.82), location: 0.47),
+            .init(color: Color(red: 0.82, green: 0.29, blue: 0.35), location: 1.0)
         ]
     ),
     OnboardingPage(
         title: "Scissors",
-        description: "Fast, sharp, and always ready to cut through the nonsense. Two blades, one mission — snip and win!",
+        description: "An underestimated opponent. He may seem fragile, but in reality he's a noose that cuts off your air.",
         imageName: "scissors",
-        feetImageName: nil,
+        feetImageName: "scissors_feet",
         gradientColors: [],
         gradientStops: [
-            .init(color: Color(red: 1.0, green: 0.92, blue: 0.70), location: 0),
-            .init(color: Color(red: 0.95, green: 0.72, blue: 0.40), location: 0.47),
-            .init(color: Color(red: 0.60, green: 0.20, blue: 0.15), location: 1.0)
+            .init(color: Color(red: 0.57, green: 0.51, blue: 0.80), location: 0),
+            .init(color: Color(red: 0.68, green: 0.61, blue: 0.76), location: 0.47),
+            .init(color: Color(red: 0.48, green: 0.28, blue: 0.25), location: 1.0)
         ]
     )
 ]
@@ -112,7 +112,7 @@ struct OnboardingPageView: View {
 
                 // Description + button at bottom
                 VStack(alignment: .leading, spacing: 20) {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text(page.title)
                             .font(.system(size: 47, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
@@ -124,13 +124,15 @@ struct OnboardingPageView: View {
                     }
 
                     Button(action: onNext) {
-                        Text(isLastPage ? "Get started" : "Next")
-                            .font(.system(size: 30, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.black.opacity(0.2))
-                            .clipShape(Capsule())
+                        HStack(alignment: .center, spacing: 10) {
+                            Text(isLastPage ? "Get started" : "Next")
+                                .font(.system(size: 30, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                        }
+                        .padding(.horizontal, 30)
+                        .padding(.vertical, 16)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .background(Color.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 40))
                     }
                 }
                 .padding(.horizontal, 30)
@@ -150,30 +152,21 @@ struct OnboardingPageView: View {
 
     @ViewBuilder
     private func characterImage(in geo: GeometryProxy) -> some View {
-        if page.feetImageName != nil {
-            // Rock: two-layer image composition
-            ZStack {
-                Image(page.imageName)
+        ZStack {
+            Image(page.imageName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: geo.size.width * 0.95)
+
+            if let feet = page.feetImageName {
+                Image(feet)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: geo.size.width * 0.95)
-                    .offset(x: 10)
-
-                if let feet = page.feetImageName {
-                    Image(feet)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: geo.size.width)
-                        .offset(y: geo.size.width * 0.65)
-                }
+                    .frame(width: geo.size.width)
+                    .offset(y: geo.size.width * 0.65)
             }
-            .offset(y: geo.size.height * 0.12)
-        } else {
-            // Paper / Scissors: single emoji fallback (until real images are added)
-            Text(page.imageName == "paper" ? "✋" : "✌️")
-                .font(.system(size: 260))
-                .offset(y: geo.size.height * 0.15)
         }
+        .offset(y: geo.size.height * 0.08)
     }
 
     private func animateIn() {

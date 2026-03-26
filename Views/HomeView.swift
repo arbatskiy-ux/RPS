@@ -54,6 +54,15 @@ struct HomeView: View {
                 }
 
                 Spacer()
+
+                Button {
+                    appState.currentScreen = .onboarding
+                } label: {
+                    Text("Об игре")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.bottom, 8)
             }
             .padding()
         }
