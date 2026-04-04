@@ -9,6 +9,10 @@ struct OnboardingPage {
     let feetImageName: String?
     let gradientColors: [Color]
     let gradientStops: [Gradient.Stop]?
+    let buttonTopColor: Color
+    let buttonBottomColor: Color
+    let buttonBorderColor: Color
+    let buttonBorderWidth: CGFloat
 }
 
 private let onboardingPages: [OnboardingPage] = [
@@ -22,7 +26,11 @@ private let onboardingPages: [OnboardingPage] = [
             .init(color: Color(red: 0.91, green: 0.65, blue: 0.91), location: 0),
             .init(color: Color(red: 0.50, green: 0.74, blue: 0.92), location: 0.47),
             .init(color: Color(red: 0.07, green: 0.37, blue: 0.22), location: 1.0)
-        ]
+        ],
+        buttonTopColor: Color(red: 0.306, green: 0.933, blue: 0.404),
+        buttonBottomColor: Color(red: 0.180, green: 0.522, blue: 0.341),
+        buttonBorderColor: Color(red: 0.125, green: 0.408, blue: 0.255),
+        buttonBorderWidth: 2
     ),
     OnboardingPage(
         title: "Paper",
@@ -34,7 +42,11 @@ private let onboardingPages: [OnboardingPage] = [
             .init(color: Color(red: 0.97, green: 0.82, blue: 0.55), location: 0),
             .init(color: Color(red: 0.96, green: 0.65, blue: 0.82), location: 0.47),
             .init(color: Color(red: 0.82, green: 0.29, blue: 0.35), location: 1.0)
-        ]
+        ],
+        buttonTopColor: Color(red: 0.820, green: 0.322, blue: 0.388),
+        buttonBottomColor: Color(red: 0.443, green: 0.141, blue: 0.180),
+        buttonBorderColor: Color(red: 0.376, green: 0, blue: 0.047),
+        buttonBorderWidth: 1
     ),
     OnboardingPage(
         title: "Scissors",
@@ -46,7 +58,11 @@ private let onboardingPages: [OnboardingPage] = [
             .init(color: Color(red: 0.57, green: 0.51, blue: 0.80), location: 0),
             .init(color: Color(red: 0.68, green: 0.61, blue: 0.76), location: 0.47),
             .init(color: Color(red: 0.48, green: 0.28, blue: 0.25), location: 1.0)
-        ]
+        ],
+        buttonTopColor: Color(red: 0.490, green: 0.298, blue: 0.275),
+        buttonBottomColor: Color(red: 0.267, green: 0.118, blue: 0.102),
+        buttonBorderColor: Color(red: 0.220, green: 0.098, blue: 0.082),
+        buttonBorderWidth: 1
     )
 ]
 
@@ -118,21 +134,28 @@ struct OnboardingPageView: View {
                             .foregroundColor(.white)
 
                         Text(page.description)
-                            .font(.system(size: 16))
+                            .font(.system(size: 20))
                             .foregroundColor(.white)
                             .lineSpacing(3)
+                            .kerning(-0.45)
                     }
 
                     Button(action: onNext) {
-                        HStack(alignment: .center, spacing: 10) {
-                            Text(isLastPage ? "Get started" : "Next")
-                                .font(.system(size: 30, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                        }
-                        .padding(.horizontal, 30)
-                        .padding(.vertical, 16)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .background(Color.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 40))
+                        Text(isLastPage ? "Get started" : "Next")
+                            .font(.system(size: 30, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 30)
+                            .padding(.vertical, 16)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                LinearGradient(
+                                    colors: [page.buttonTopColor, page.buttonBottomColor],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                in: Capsule()
+                            )
+                            .overlay(Capsule().stroke(page.buttonBorderColor, lineWidth: page.buttonBorderWidth))
                     }
                 }
                 .padding(.horizontal, 30)
