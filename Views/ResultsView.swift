@@ -89,8 +89,8 @@ struct ResultsView: View {
     // MARK: - Cards
 
     private var cardsSection: some View {
+        // Loser card rendered first (behind), winner card on top
         ZStack {
-            // Loser card — behind, offset right+down
             PlayerResultCard(
                 name: loserName,
                 avatarData: loserAvatarData,
@@ -99,9 +99,7 @@ struct ResultsView: View {
                 scoreText: nil
             )
             .rotationEffect(.degrees(5), anchor: .center)
-            .offset(x: 50, y: 55)
 
-            // Winner card — in front
             PlayerResultCard(
                 name: winnerName,
                 avatarData: winnerAvatarData,
@@ -110,10 +108,12 @@ struct ResultsView: View {
                 scoreText: scoreLabel
             )
             .rotationEffect(.degrees(-4), anchor: .center)
-            .offset(x: -20, y: 0)
+            .offset(x: -30, y: -20)
         }
-        .frame(height: 360)
-        .padding(.bottom, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 32)
+        // shift loser card right so it peeks from behind
+        .offset(x: 24)
     }
 
     // MARK: - Bottom section
