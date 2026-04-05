@@ -476,11 +476,11 @@ struct RevealView: View {
 
                     VStack(alignment: .center, spacing: -20) {
                         Text(resultLine1)
-                            .font(.system(size: 80, weight: .heavy, design: .rounded))
+                            .font(.system(size: 90, weight: .heavy, design: .rounded))
                             .foregroundStyle(.white)
                         if !resultLine2.isEmpty {
                             Text(resultLine2)
-                                .font(.system(size: 80, weight: .heavy, design: .rounded))
+                                .font(.system(size: 90, weight: .heavy, design: .rounded))
                                 .foregroundStyle(.white)
                         }
                     }

@@ -160,7 +160,7 @@ struct OnboardingPageView: View {
                 }
                 .padding(.horizontal, 30)
                 .offset(y: descriptionAppeared
-                         ? geo.size.height * 0.72
+                         ? geo.size.height * 0.68
                          : geo.size.height * 1.1)
                 .opacity(descriptionAppeared ? 1 : 0)
             }
@@ -179,17 +179,17 @@ struct OnboardingPageView: View {
             Image(page.imageName)
                 .resizable()
                 .scaledToFit()
-                .frame(width: geo.size.width * 0.95)
+                .frame(width: geo.size.width * 0.82)
 
             if let feet = page.feetImageName {
                 Image(feet)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: geo.size.width)
-                    .offset(y: geo.size.width * 0.65)
+                    .frame(width: geo.size.width * 0.90)
+                    .offset(y: geo.size.height * 0.40)
             }
         }
-        .offset(y: geo.size.height * 0.08)
+        .offset(y: geo.size.height * 0.18)
     }
 
     private func animateIn() {
