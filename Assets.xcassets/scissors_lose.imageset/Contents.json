@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "Scissors_lose.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

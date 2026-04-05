@@ -32,6 +32,13 @@ struct GameView: View {
                 .transition(.opacity)
             }
 
+            // Full-screen round result overlay
+            if case .reveal(let result) = engine.phase {
+                RevealView(result: result, state: engine.state, isHost: engine.isHost)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+            }
+
         }
     }
 
@@ -114,8 +121,8 @@ struct GameView: View {
                     .animation(.easeInOut, value: engine.choiceTimeRemaining)
             }
 
-        case .reveal(let result):
-            RevealView(result: result, state: engine.state, isHost: engine.isHost)
+        case .reveal:
+            EmptyView() // handled by full-screen RevealView overlay
 
         case .matchResult, .idle:
             EmptyView()
@@ -366,71 +373,110 @@ struct RevealView: View {
     let state: GameState
     let isHost: Bool
 
-    private var localChoice: RPSChoice {
-        isHost ? result.hostChoice : result.guestChoice
+    private var localChoice: RPSChoice { isHost ? result.hostChoice : result.guestChoice }
+    private var localName: String { isHost ? state.hostName : state.guestName }
+
+    private var outcome: Outcome {
+        guard let winner = result.winnerName else { return .draw }
+        return winner == localName ? .win : .lose
     }
 
-    private var opponentChoice: RPSChoice {
-        isHost ? result.guestChoice : result.hostChoice
-    }
+    enum Outcome { case win, lose, draw }
 
-    private var localName: String {
-        isHost ? state.hostName : state.guestName
-    }
-
-    private var resultText: String {
-        if let winner = result.winnerName {
-            return winner == localName ? "You Win!" : "You Lose!"
+    private var characterImageName: String {
+        switch (localChoice, outcome) {
+        case (.rock,     .win):  return "rock_win"
+        case (.rock,     .lose): return "rock_lose"
+        case (.paper,    .lose): return "paper_lose"
+        case (.scissors, .win):  return "scissors_win"
+        case (.scissors, .lose): return "scissors_lose"
+        default:                 return ""
         }
-        return "Draw!"
     }
 
-    private var resultColor: Color {
-        if let winner = result.winnerName {
-            return winner == localName ? .green : .red
+    private var bgTop: Color    { Color(red: 0.047, green: 0.082, blue: 0.165) }
+    private var bgBottom: Color {
+        switch outcome {
+        case .win:  return Color(red: 0.082, green: 0.612, blue: 0.082)
+        case .lose: return Color(red: 0.784, green: 0.039, blue: 0.039)
+        case .draw: return Color(red: 0.35, green: 0.35, blue: 0.06)
         }
-        return .yellow
+    }
+    private var buttonColor: Color {
+        switch outcome {
+        case .win:  return Color(red: 0.18, green: 0.72, blue: 0.18)
+        case .lose: return Color(red: 0.55, green: 0.04, blue: 0.04)
+        case .draw: return Color.gray
+        }
+    }
+    private var resultLine1: String {
+        switch outcome {
+        case .win:  return "You"
+        case .lose: return "You"
+        case .draw: return "Draw!"
+        }
+    }
+    private var resultLine2: String {
+        switch outcome {
+        case .win:  return "Win!"
+        case .lose: return "Lose"
+        case .draw: return ""
+        }
     }
 
     var body: some View {
-        VStack(spacing: 24) {
-            Text("Round \(result.round)")
-                .font(.title3)
-                .foregroundStyle(.white.opacity(0.6))
+        ZStack {
+            LinearGradient(colors: [bgTop, bgBottom], startPoint: .top, endPoint: .bottom)
 
-            // Both moves displayed — same result on both devices
-            HStack(spacing: 40) {
-                VStack(spacing: 8) {
-                    // Placeholder: use Image(localChoice.imageName) when assets are added
-                    Text(localChoice.symbol)
-                        .font(.system(size: 72))
-                    Text("You")
-                        .font(.caption)
+            VStack(spacing: 0) {
+                Text("Round \(result.round)")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.top, 60)
+
+                Spacer()
+
+                // Character illustration
+                let imgName = characterImageName
+                if !imgName.isEmpty {
+                    Image(imgName)
+                        .resizable()
+                        .scaledToFit()
+                        .padding(.horizontal, 8)
+                } else {
+                    Image(systemName: localChoice == .paper ? "hand.raised.fill" : "scissors")
+                        .font(.system(size: 120))
                         .foregroundStyle(.white.opacity(0.6))
+                        .padding(.bottom, 40)
                 }
 
-                Text("vs")
-                    .font(.title2.bold())
-                    .foregroundStyle(.white.opacity(0.3))
-
-                VStack(spacing: 8) {
-                    Text(opponentChoice.symbol)
-                        .font(.system(size: 72))
-                    Text("Them")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
+                // Result text
+                VStack(alignment: .leading, spacing: -8) {
+                    Text(resultLine1)
+                        .font(.system(size: 80, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                    if !resultLine2.isEmpty {
+                        Text(resultLine2)
+                            .font(.system(size: 80, weight: .heavy, design: .rounded))
+                            .foregroundStyle(.white)
+                    }
                 }
-            }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 30)
+                .padding(.top, 8)
 
-            Text(resultText)
-                .font(.largeTitle.bold())
-                .foregroundStyle(resultColor)
-
-            if result.winnerName == nil {
-                Text("Replaying round...")
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.5))
+                // Next round button
+                Text(result.winnerName == nil ? "Replaying..." : "Next round")
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+                    .background(buttonColor, in: Capsule())
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+                    .padding(.bottom, 50)
             }
         }
+        .animation(.easeInOut(duration: 0.4), value: result.round)
     }
 }
