@@ -3,7 +3,13 @@ import SwiftUI
 /// Game Screen — displays countdown, symbols, shake mode, and choosing phase.
 struct GameView: View {
     @EnvironmentObject private var appState: AppState
+
     private var engine: GameEngine { appState.gameEngine }
+
+    private var isChoosing: Bool {
+        if case .choosing = engine.phase { return true }
+        return false
+    }
 
     var body: some View {
         ZStack {
@@ -14,32 +20,18 @@ struct GameView: View {
                 Spacer()
                 centerContent
                 Spacer()
-                bottomArea
             }
 
-            // Full-screen countdown overlay
-            if case .countdown = engine.phase {
-                CountdownOverlayView(
-                    countdownValue: engine.countdownValue,
-                    countdownLabel: engine.countdownLabel,
-                    currentRound: engine.state.currentRound,
-                    hostName: engine.state.hostName,
-                    guestName: engine.state.guestName,
-                    hostAvatarData: hostAvatarData,
-                    guestAvatarData: guestAvatarData
-                )
+            // Full-screen Choose Move overlay
+            if isChoosing {
+                ChooseMoveView(timeRemaining: engine.choiceTimeRemaining) { choice in
+                    engine.choose(choice)
+                }
                 .ignoresSafeArea()
                 .transition(.opacity)
             }
-
-            // Full-screen round result overlay
-            if case .reveal(let result) = engine.phase {
-                RevealView(result: result, state: engine.state, isHost: engine.isHost)
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-            }
-
         }
+        .animation(.easeInOut(duration: 0.3), value: isChoosing)
     }
 
     // MARK: - Top Bar
@@ -92,54 +84,259 @@ struct GameView: View {
             ShakeModeView(motionManager: appState.motionManager, engine: engine)
 
         case .countdown:
-            EmptyView() // handled by CountdownOverlayView
-
-        case .choosing:
-            VStack(spacing: 20) {
+            VStack(spacing: 16) {
                 Text("Round \(engine.state.currentRound)")
                     .font(.title3)
                     .foregroundStyle(.white.opacity(0.6))
 
-                if engine.localChoice != nil {
-                    VStack(spacing: 12) {
-                        Text(engine.localChoice!.symbol)
-                            .font(.system(size: 80))
-                        Text("Waiting for opponent...")
-                            .foregroundStyle(.white.opacity(0.6))
-                            .font(.headline)
-                    }
-                } else {
-                    Text("Choose your move!")
-                        .font(.title.bold())
-                        .foregroundStyle(.white)
-                }
+                Text(engine.countdownLabel)
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .transition(.scale.combined(with: .opacity))
+                    .animation(.easeOut(duration: 0.3), value: engine.countdownLabel)
+                    .id(engine.countdownLabel)
 
-                Text("\(engine.choiceTimeRemaining)")
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
-                    .foregroundStyle(engine.choiceTimeRemaining <= 2 ? .red : .white.opacity(0.8))
+                Text("\(engine.countdownValue)")
+                    .font(.system(size: 100, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.3))
                     .contentTransition(.numericText())
-                    .animation(.easeInOut, value: engine.choiceTimeRemaining)
+                    .animation(.easeOut(duration: 0.3), value: engine.countdownValue)
             }
 
-        case .reveal:
-            EmptyView() // handled by full-screen RevealView overlay
+        case .choosing:
+            EmptyView() // Handled by ChooseMoveView overlay
+
+        case .reveal(let result):
+            RevealView(result: result, state: engine.state, isHost: engine.isHost)
 
         case .matchResult, .idle:
             EmptyView()
         }
     }
+}
 
-    // MARK: - Bottom Area
+// MARK: - Choose Move View
+
+struct ChooseMoveView: View {
+    let timeRemaining: Int
+    let onChoice: (RPSChoice) -> Void
+
+    @State private var tappedChoice: RPSChoice? = nil
+    @State private var emojiPopped = false
+    @State private var emojiExpanded = false
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                // Base dark background
+                LinearGradient(
+                    stops: [
+                        .init(color: Color(r: 36, g: 74, b: 100), location: 0.0),
+                        .init(color: Color(r: 12, g: 12, b: 12), location: 0.475)
+                    ],
+                    startPoint: .topTrailing,
+                    endPoint: .bottomLeading
+                )
+                .ignoresSafeArea()
+
+                // Colored glow from bottom when expanded
+                if emojiExpanded, let choice = tappedChoice {
+                    VStack {
+                        Spacer()
+                        LinearGradient(
+                            colors: [choice.expandedGlowColor, .clear],
+                            startPoint: .bottom,
+                            endPoint: .top
+                        )
+                        .frame(height: geo.size.height * 0.58)
+                    }
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                }
+
+                // "Choose your move!" title + circular timer
+                VStack(spacing: 32) {
+                    Spacer().frame(height: geo.safeAreaInsets.top + 52)
+                    Text("Choose\nyour\nmove!")
+                        .font(.system(size: 70, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(-4)
+                        .opacity(tappedChoice == nil ? 1 : 0)
+                        .animation(.easeOut(duration: 0.2), value: tappedChoice == nil)
+
+                    // Circular countdown timer
+                    if tappedChoice == nil {
+                        let isUrgent = timeRemaining <= 2
+                        let timerColor: Color = isUrgent ? .red : .white
+                        ZStack {
+                            Circle()
+                                .stroke(Color.white.opacity(0.15), lineWidth: 5)
+                            Circle()
+                                .trim(from: 0, to: CGFloat(timeRemaining) / 5.0)
+                                .stroke(
+                                    timerColor.opacity(0.85),
+                                    style: StrokeStyle(lineWidth: 5, lineCap: .round)
+                                )
+                                .rotationEffect(.degrees(-90))
+                                .animation(.linear(duration: 1), value: timeRemaining)
+                            Text("\(timeRemaining)")
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .foregroundStyle(timerColor)
+                                .contentTransition(.numericText())
+                                .animation(.easeInOut(duration: 0.3), value: timeRemaining)
+                        }
+                        .frame(width: 72, height: 72)
+                        .scaleEffect(isUrgent ? 1.1 : 1.0)
+                        .animation(.spring(response: 0.3), value: isUrgent)
+                        .transition(.scale.combined(with: .opacity))
+                    }
+
+                    Spacer()
+                }
+
+                // Full-screen emoji (expands to center after pop)
+                if emojiExpanded, let choice = tappedChoice {
+                    Text(choice.symbol)
+                        .font(.system(size: 270))
+                        .rotationEffect(choice == .paper ? .degrees(-15) : .zero)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.scale(scale: 0.25).combined(with: .opacity))
+                }
+
+                // Buttons (hidden after expand)
+                if !emojiExpanded {
+                    VStack(spacing: 32) {
+                        ForEach(RPSChoice.allCases, id: \.self) { choice in
+                            choiceButtonRow(choice)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .padding(.bottom, geo.safeAreaInsets.bottom + 16)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.spring(response: 0.5, dampingFraction: 0.75), value: emojiExpanded)
+        }
+    }
 
     @ViewBuilder
-    private var bottomArea: some View {
-        if case .choosing = engine.phase, engine.localChoice == nil {
-            RPSChoiceButtons { choice in
-                engine.choose(choice)
+    private func choiceButtonRow(_ choice: RPSChoice) -> some View {
+        let isSelected = tappedChoice == choice
+
+        ZStack {
+            // Button shell (clipped to capsule)
+            HStack {
+                Spacer()
+                Text(choice.label)
+                    .font(.system(size: 40, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white)
+                    .opacity(isSelected ? 0 : 1)
+                Spacer()
+                // Space placeholder where emoji normally sits
+                Color.clear.frame(width: 64, height: 50)
             }
-            .padding(.bottom, 40)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .padding(.horizontal, 30)
+            .frame(height: 80)
+            .background(choice.buttonGradient)
+            .clipShape(RoundedRectangle(cornerRadius: 40))
+            .overlay(RoundedRectangle(cornerRadius: 40).stroke(choice.borderColor, lineWidth: 2))
+
+            // Emoji (NOT inside clipped capsule — floats freely)
+            HStack {
+                Spacer()
+                Text(choice.symbol)
+                    .font(.system(size: isSelected && emojiPopped ? 88 : 50))
+                    .offset(y: isSelected && emojiPopped ? -64 : 0)
+                    .animation(
+                        .spring(response: 0.35, dampingFraction: 0.45),
+                        value: emojiPopped
+                    )
+                    .padding(.trailing, 26)
+            }
+            .frame(height: 80)
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            handleTap(choice)
+        }
+        .disabled(tappedChoice != nil)
+    }
+
+    private func handleTap(_ choice: RPSChoice) {
+        guard tappedChoice == nil else { return }
+        onChoice(choice)
+
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+            tappedChoice = choice
+            emojiPopped = true
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+            withAnimation(.spring(response: 0.55, dampingFraction: 0.7)) {
+                emojiExpanded = true
+            }
+        }
+    }
+}
+
+// MARK: - RPSChoice design extensions
+
+private extension RPSChoice {
+    var buttonGradient: LinearGradient {
+        switch self {
+        case .rock:
+            return LinearGradient(
+                colors: [Color(hex: "4eee67"), Color(hex: "2e8557")],
+                startPoint: .top, endPoint: .bottom
+            )
+        case .paper:
+            return LinearGradient(
+                colors: [Color(hex: "a533ff"), Color(hex: "46007e")],
+                startPoint: .top, endPoint: .bottom
+            )
+        case .scissors:
+            return LinearGradient(
+                colors: [Color(hex: "d84921"), Color(hex: "731900")],
+                startPoint: .top, endPoint: .bottom
+            )
+        }
+    }
+
+    var borderColor: Color {
+        switch self {
+        case .rock:     return Color(hex: "206841")
+        case .paper:    return Color(hex: "50008f")
+        case .scissors: return Color(hex: "4a1000")
+        }
+    }
+
+    var expandedGlowColor: Color {
+        switch self {
+        case .rock:     return Color(hex: "2e8557")
+        case .paper:    return Color(hex: "762aad")
+        case .scissors: return Color(hex: "731900")
+        }
+    }
+}
+
+// MARK: - Color helpers
+
+private extension Color {
+    init(hex: String) {
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        self.init(
+            .sRGB,
+            red:   Double((int >> 16) & 0xFF) / 255,
+            green: Double((int >> 8)  & 0xFF) / 255,
+            blue:  Double( int        & 0xFF) / 255
+        )
+    }
+
+    init(r: Int, g: Int, b: Int) {
+        self.init(.sRGB, red: Double(r)/255, green: Double(g)/255, blue: Double(b)/255)
     }
 }
 
@@ -176,7 +373,6 @@ struct ShakeModeView: View {
                     value: isPulsing
                 )
 
-            // Shake counter: 3 dots
             HStack(spacing: 16) {
                 ForEach(0..<3, id: \.self) { index in
                     Circle()
@@ -211,108 +407,6 @@ struct ShakeModeView: View {
     }
 }
 
-// MARK: - Countdown Overlay
-
-struct CountdownOverlayView: View {
-    let countdownValue: Int
-    let countdownLabel: String
-    let currentRound: Int
-    let hostName: String
-    let guestName: String
-    let hostAvatarData: Data?
-    let guestAvatarData: Data?
-
-    private var themeColor: Color {
-        switch countdownValue {
-        case 3: return Color(red: 0.29, green: 0.878, blue: 0.4)      // Green (Rock)
-        case 2: return Color(red: 0.455, green: 0.165, blue: 0.671)   // Purple (Paper)
-        default: return Color(red: 0.643, green: 0.275, blue: 0.173)  // Red-Orange (Scissors)
-        }
-    }
-
-    private var gradientAccent: Color {
-        switch countdownValue {
-        case 3: return Color(red: 0.31, green: 0.937, blue: 0.404)
-        case 2: return Color(red: 0.463, green: 0.165, blue: 0.678)
-        default: return Color(red: 0.678, green: 0.286, blue: 0.165)
-        }
-    }
-
-    private var cleanLabel: String {
-        countdownLabel
-            .replacingOccurrences(of: "...", with: "")
-            .replacingOccurrences(of: "!", with: "")
-    }
-
-    var body: some View {
-        ZStack {
-            // Dark angled background
-            LinearGradient(
-                stops: [
-                    .init(color: Color(red: 0.047, green: 0.047, blue: 0.047), location: 0.525),
-                    .init(color: Color(red: 0.141, green: 0.29, blue: 0.392), location: 0.99)
-                ],
-                startPoint: UnitPoint(x: 0.6, y: 1.0),
-                endPoint: UnitPoint(x: 0.4, y: 0.0)
-            )
-
-            // Bottom colored glow
-            VStack {
-                Spacer()
-                LinearGradient(
-                    colors: [gradientAccent.opacity(0.8), gradientAccent.opacity(0)],
-                    startPoint: .bottom,
-                    endPoint: .top
-                )
-                .frame(height: 380)
-            }
-
-            // Content
-            VStack(spacing: 0) {
-                Text("Round #\(currentRound)")
-                    .font(.system(size: 50, weight: .semibold, design: .rounded))
-                    .foregroundStyle(themeColor)
-                    .padding(.top, 70)
-
-                // Avatar row
-                HStack(spacing: 20) {
-                    PlayerAvatar(name: hostName, imageData: hostAvatarData, size: 64)
-                        .overlay(Circle().stroke(themeColor, lineWidth: 5))
-
-                    Text("VS")
-                        .font(.system(size: 50, weight: .semibold, design: .rounded))
-                        .foregroundStyle(themeColor)
-
-                    PlayerAvatar(name: guestName, imageData: guestAvatarData, size: 64)
-                        .overlay(Circle().stroke(themeColor, lineWidth: 5))
-                }
-                .padding(.top, 24)
-
-                Spacer()
-
-                // Giant countdown number
-                Text("\(countdownValue)")
-                    .font(.system(size: 300, weight: .bold, design: .rounded))
-                    .foregroundStyle(themeColor)
-                    .minimumScaleFactor(0.7)
-                    .lineLimit(1)
-                    .contentTransition(.numericText())
-
-                // Label (Rock / Paper / Scissors)
-                Text(cleanLabel)
-                    .font(.system(size: 80, weight: .bold, design: .rounded))
-                    .foregroundStyle(themeColor)
-                    .transition(.scale.combined(with: .opacity))
-                    .id(countdownLabel)
-
-                Spacer()
-                    .frame(height: 100)
-            }
-        }
-        .animation(.easeInOut(duration: 0.4), value: countdownValue)
-    }
-}
-
 // MARK: - Subviews
 
 struct PlayerScorePill: View {
@@ -342,164 +436,74 @@ struct PlayerScorePill: View {
     }
 }
 
-struct RPSChoiceButtons: View {
-    let onChoice: (RPSChoice) -> Void
-
-    var body: some View {
-        HStack(spacing: 24) {
-            ForEach(RPSChoice.allCases, id: \.self) { choice in
-                Button {
-                    onChoice(choice)
-                } label: {
-                    VStack(spacing: 8) {
-                        // Placeholder: use Image(choice.imageName) when assets are added
-                        Text(choice.symbol)
-                            .font(.system(size: 56))
-                        Text(choice.label)
-                            .font(.caption.bold())
-                            .foregroundStyle(.white)
-                    }
-                    .frame(width: 100, height: 100)
-                    .background(Color.white.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                }
-            }
-        }
-    }
-}
-
 struct RevealView: View {
     let result: RoundResult
     let state: GameState
     let isHost: Bool
 
-    private var localChoice: RPSChoice { isHost ? result.hostChoice : result.guestChoice }
-    private var localName: String { isHost ? state.hostName : state.guestName }
-
-    private var outcome: Outcome {
-        guard let winner = result.winnerName else { return .draw }
-        return winner == localName ? .win : .lose
+    private var localChoice: RPSChoice {
+        isHost ? result.hostChoice : result.guestChoice
     }
 
-    enum Outcome { case win, lose, draw }
-
-    private var characterImageName: String {
-        switch (localChoice, outcome) {
-        case (.rock,     .win):  return "rock_win"
-        case (.rock,     .lose): return "rock_lose"
-        case (.paper,    .win):  return "paper_win"
-        case (.paper,    .lose): return "paper_lose"
-        case (.scissors, .win):  return "scissors_win"
-        case (.scissors, .lose): return "scissors_lose"
-        default:                 return ""
-        }
+    private var opponentChoice: RPSChoice {
+        isHost ? result.guestChoice : result.hostChoice
     }
 
-    private var bgTop: Color    { Color(red: 0.047, green: 0.082, blue: 0.165) }
-    private var bgBottom: Color {
-        switch outcome {
-        case .win:  return Color(red: 0.082, green: 0.612, blue: 0.082)
-        case .lose: return Color(red: 0.784, green: 0.039, blue: 0.039)
-        case .draw: return Color(red: 0.35, green: 0.35, blue: 0.06)
-        }
+    private var localName: String {
+        isHost ? state.hostName : state.guestName
     }
-    private var buttonColor: Color {
-        switch outcome {
-        case .win:  return Color(red: 0.18, green: 0.72, blue: 0.18)
-        case .lose: return Color(red: 0.55, green: 0.04, blue: 0.04)
-        case .draw: return Color.gray
+
+    private var resultText: String {
+        if let winner = result.winnerName {
+            return winner == localName ? "You Win!" : "You Lose!"
         }
+        return "Draw!"
     }
-    private var resultLine1: String {
-        switch outcome {
-        case .win:  return "You"
-        case .lose: return "You"
-        case .draw: return "Draw!"
+
+    private var resultColor: Color {
+        if let winner = result.winnerName {
+            return winner == localName ? .green : .red
         }
-    }
-    private var resultLine2: String {
-        switch outcome {
-        case .win:  return "Win!"
-        case .lose: return "Lose"
-        case .draw: return ""
-        }
+        return .yellow
     }
 
     var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .top) {
-                // Dark background
-                bgTop.ignoresSafeArea()
+        VStack(spacing: 24) {
+            Text("Round \(result.round)")
+                .font(.title3)
+                .foregroundStyle(.white.opacity(0.6))
 
-                // Character — sized to ~69% height, 73% width, top-offset 16.5% (Figma 416:494)
-                let imgName = characterImageName
-                if !imgName.isEmpty {
-                    Image(imgName)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(
-                            width:  geo.size.width  * 0.73,
-                            height: geo.size.height * 0.69
-                        )
-                        .position(
-                            x: geo.size.width  * 0.1372 + geo.size.width  * 0.73 / 2,
-                            y: geo.size.height * 0.1654 + geo.size.height * 0.69 / 2
-                        )
-                } else {
-                    Image(systemName: localChoice == .paper ? "hand.raised.fill" : "scissors")
-                        .font(.system(size: 140))
+            HStack(spacing: 40) {
+                VStack(spacing: 8) {
+                    Text(localChoice.symbol)
+                        .font(.system(size: 72))
+                    Text("You")
+                        .font(.caption)
                         .foregroundStyle(.white.opacity(0.6))
-                        .position(x: geo.size.width / 2, y: geo.size.height * 0.38)
                 }
 
-                // Gradient overlay ON TOP of character — transparent → accent, overlaps legs
-                LinearGradient(
-                    stops: [
-                        .init(color: .clear,   location: 0.0),
-                        .init(color: .clear,   location: 0.42),
-                        .init(color: bgBottom, location: 0.78),
-                        .init(color: bgBottom, location: 1.0),
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+                Text("vs")
+                    .font(.title2.bold())
+                    .foregroundStyle(.white.opacity(0.3))
 
-                // UI overlay: Round label + text + button
-                VStack(spacing: 0) {
-                    Text("Round \(result.round)")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.top, 60)
-
-                    Spacer()
-
-                    VStack(alignment: .center, spacing: -20) {
-                        Text(resultLine1)
-                            .font(.system(size: 90, weight: .heavy, design: .rounded))
-                            .foregroundStyle(.white)
-                        if !resultLine2.isEmpty {
-                            Text(resultLine2)
-                                .font(.system(size: 90, weight: .heavy, design: .rounded))
-                                .foregroundStyle(.white)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.horizontal, 30)
-
-                    Text(result.winnerName == nil ? "Replaying..." : "Next round")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 18)
-                        .background(buttonColor, in: Capsule())
-                        .padding(.horizontal, 20)
-                        .padding(.top, 20)
-                        .padding(.bottom, 50)
+                VStack(spacing: 8) {
+                    Text(opponentChoice.symbol)
+                        .font(.system(size: 72))
+                    Text("Them")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
                 }
             }
+
+            Text(resultText)
+                .font(.largeTitle.bold())
+                .foregroundStyle(resultColor)
+
+            if result.winnerName == nil {
+                Text("Replaying round...")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.5))
+            }
         }
-        .ignoresSafeArea()
-        .animation(.easeInOut(duration: 0.4), value: result.round)
     }
 }
