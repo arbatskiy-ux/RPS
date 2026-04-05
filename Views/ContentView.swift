@@ -6,7 +6,7 @@ struct ContentView: View {
     var body: some View {
         switch appState.currentScreen {
         case .onboarding:
-            OnboardingView()
+            OnboardingView(onComplete: { appState.goToHome() })
         case .home:
             HomeView()
         case .connection:
