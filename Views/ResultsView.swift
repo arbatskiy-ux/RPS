@@ -5,124 +5,128 @@ struct ResultsView: View {
 
     private var state: GameState { appState.gameEngine.state }
     private var isHost: Bool { appState.gameEngine.isHost }
+    private var localName: String { isHost ? state.hostName : state.guestName }
 
-    private var localName: String {
-        isHost ? state.hostName : state.guestName
+    private var didWin: Bool { state.matchWinner == localName }
+
+    private var winnerName: String { state.matchWinner ?? localName }
+    private var loserName: String {
+        winnerName == state.hostName ? state.guestName : state.hostName
     }
 
-    private var didWin: Bool {
-        state.matchWinner == localName
+    private var winnerAvatarData: Data? {
+        winnerName == state.hostName
+            ? (isHost ? appState.avatarData : appState.opponentAvatarData)
+            : (isHost ? appState.opponentAvatarData : appState.avatarData)
     }
 
-    private var hostAvatarData: Data? {
-        isHost ? appState.avatarData : appState.opponentAvatarData
+    private var loserAvatarData: Data? {
+        loserName == state.hostName
+            ? (isHost ? appState.avatarData : appState.opponentAvatarData)
+            : (isHost ? appState.opponentAvatarData : appState.avatarData)
     }
 
-    private var guestAvatarData: Data? {
-        isHost ? appState.opponentAvatarData : appState.avatarData
+    private var scoreLabel: String {
+        "\(max(state.hostWins, state.guestWins)) /\(min(state.hostWins, state.guestWins))"
     }
 
-    // Winner gets green gradient, loser gets purple
     private var accentColor: Color {
         didWin ? Color(red: 0.31, green: 0.937, blue: 0.404)
                : Color(red: 0.463, green: 0.165, blue: 0.678)
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Dark background
-            Color(red: 0.047, green: 0.047, blue: 0.047)
-                .ignoresSafeArea()
+        ZStack {
+            Color(red: 0.047, green: 0.047, blue: 0.047).ignoresSafeArea()
 
-            // Bottom gradient glow (winner=green, loser=purple)
-            LinearGradient(
-                colors: [accentColor.opacity(0.55), accentColor.opacity(0)],
-                startPoint: .bottom,
-                endPoint: .top
-            )
-            .frame(height: 420)
-            .ignoresSafeArea()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    // Title
-                    Text(didWin ? "You Won the\nMatch!" : "You Lost the\nMatch!")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 24)
-                        .padding(.top, 20)
-                        .padding(.bottom, 28)
-
-                    // Score card
-                    scoreCard
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 32)
-
-                    // Round History table
-                    roundHistory
-
-                    // Buttons
-                    buttonsSection
-                        .padding(.horizontal, 20)
-                        .padding(.top, 28)
-                        .padding(.bottom, 48)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    headerSection
+                    cardsSection
+                    bottomSection
                 }
             }
         }
     }
 
-    // MARK: - Score Card
+    // MARK: - Header
 
-    private var scoreCard: some View {
-        HStack(spacing: 0) {
-            // Host
-            VStack(spacing: 8) {
-                PlayerAvatar(name: state.hostName, imageData: hostAvatarData, size: 56)
-                Text(state.hostName)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity)
+    private var headerSection: some View {
+        ZStack(alignment: .topLeading) {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.047, green: 0.137, blue: 0.392),
+                    Color(red: 0.047, green: 0.047, blue: 0.047)
+                ],
+                startPoint: .top, endPoint: .bottom
+            )
 
-            // Score
-            VStack(spacing: 4) {
-                Text("\(state.hostWins) – \(state.guestWins)")
-                    .font(.system(size: 38, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .monospacedDigit()
-                Text("score")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.4))
-            }
-            .frame(maxWidth: .infinity)
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    appState.gameEngine.endGame()
+                    appState.goToHome()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 36)
+                        .background(.white.opacity(0.18), in: Circle())
+                }
+                .padding(.top, 60)
+                .padding(.leading, 16)
 
-            // Guest
-            VStack(spacing: 8) {
-                PlayerAvatar(name: state.guestName, imageData: guestAvatarData, size: 56)
-                Text(state.guestName)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                Text(didWin ? "You Won the\nMatch!" : "You Lost the\nMatch!")
+                    .font(.system(size: 47, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 48)
             }
-            .frame(maxWidth: .infinity)
         }
-        .padding(.vertical, 20)
-        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 20))
     }
 
-    // MARK: - Round History
+    // MARK: - Cards
 
-    private var roundHistory: some View {
+    private var cardsSection: some View {
+        ZStack {
+            // Loser card — behind, offset right+down
+            PlayerResultCard(
+                name: loserName,
+                avatarData: loserAvatarData,
+                isWinner: false,
+                badgeText: nil,
+                scoreText: nil
+            )
+            .rotationEffect(.degrees(5), anchor: .center)
+            .offset(x: 50, y: 55)
+
+            // Winner card — in front
+            PlayerResultCard(
+                name: winnerName,
+                avatarData: winnerAvatarData,
+                isWinner: true,
+                badgeText: "Winner",
+                scoreText: scoreLabel
+            )
+            .rotationEffect(.degrees(-4), anchor: .center)
+            .offset(x: -20, y: 0)
+        }
+        .frame(height: 360)
+        .padding(.bottom, 16)
+    }
+
+    // MARK: - Bottom section
+
+    private var bottomSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Section header
             Text("Round History")
                 .font(.system(size: 30, weight: .black, design: .rounded))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 30)
-                .padding(.vertical, 10)
+                .padding(.top, 24)
+                .padding(.bottom, 8)
 
-            // Rows
             ForEach(Array(state.roundResults.enumerated()), id: \.offset) { _, result in
                 RoundHistoryRow(
                     roundNumber: result.round,
@@ -131,7 +135,22 @@ struct ResultsView: View {
                     outcome: outcomeLabel(result)
                 )
             }
+
+            buttonsSection
+                .padding(.horizontal, 20)
+                .padding(.top, 28)
+                .padding(.bottom, 56)
         }
+        .background(
+            LinearGradient(
+                colors: [Color(red: 0.047, green: 0.047, blue: 0.047), accentColor.opacity(0.7)],
+                startPoint: .top, endPoint: .bottom
+            )
+        )
+        .clipShape(UnevenRoundedRectangle(
+            topLeadingRadius: 28, bottomLeadingRadius: 0,
+            bottomTrailingRadius: 0, topTrailingRadius: 28
+        ))
     }
 
     private func outcomeLabel(_ result: RoundResult) -> String {
@@ -143,36 +162,27 @@ struct ResultsView: View {
 
     private var buttonsSection: some View {
         VStack(spacing: 12) {
-            if appState.session.isConnected && appState.gameEngine.isHost {
-                // Green "Play Again" primary button
-                Button {
-                    appState.gameEngine.startGame(shakeMode: state.isShakeModeEnabled)
-                } label: {
-                    Text("Play Again")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+            if appState.session.isConnected {
+                if appState.gameEngine.isHost {
+                    Button {
+                        appState.gameEngine.startGame(shakeMode: state.isShakeModeEnabled)
+                    } label: {
+                        Text("Play Again")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color(red: 0.047, green: 0.047, blue: 0.047))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 18)
+                            .background(accentColor, in: Capsule())
+                    }
+                } else {
+                    Text("Waiting for host...")
+                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.5))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 18)
-                        .background(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.31, green: 0.937, blue: 0.404),
-                                    Color(red: 0.18, green: 0.55, blue: 0.3)
-                                ],
-                                startPoint: .top, endPoint: .bottom
-                            ),
-                            in: Capsule()
-                        )
                 }
-            } else if appState.session.isConnected {
-                Text("Waiting for host...")
-                    .font(.system(size: 16, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.5))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
             }
 
-            // Back to Home
             Button {
                 appState.gameEngine.endGame()
                 appState.goToHome()
@@ -182,9 +192,64 @@ struct ResultsView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 18)
-                    .background(.white.opacity(0.12), in: Capsule())
+                    .background(.white.opacity(0.1), in: Capsule())
             }
         }
+    }
+}
+
+// MARK: - Player Result Card
+
+private struct PlayerResultCard: View {
+    let name: String
+    let avatarData: Data?
+    let isWinner: Bool
+    let badgeText: String?
+    let scoreText: String?
+
+    private var cardGradient: LinearGradient {
+        isWinner
+            ? LinearGradient(
+                colors: [Color(red: 0.302, green: 0.937, blue: 0.4), Color(red: 0.992, green: 0.894, blue: 0.749)],
+                startPoint: .top, endPoint: .bottom
+              )
+            : LinearGradient(
+                colors: [Color(red: 0.361, green: 0.376, blue: 0.867), Color(red: 0.851, green: 0.835, blue: 0.961)],
+                startPoint: .bottomLeading, endPoint: .topTrailing
+              )
+    }
+
+    var body: some View {
+        VStack(spacing: 24) {
+            PlayerAvatar(name: name, imageData: avatarData, size: 140)
+
+            HStack(spacing: 12) {
+                if let badge = badgeText {
+                    pillLabel(badge)
+                }
+                if let score = scoreText {
+                    pillLabel(score)
+                }
+                if badgeText == nil {
+                    pillLabel(name)
+                }
+            }
+        }
+        .padding(.top, 36)
+        .padding(.bottom, 28)
+        .padding(.horizontal, 36)
+        .frame(width: 275)
+        .background(cardGradient, in: RoundedRectangle(cornerRadius: 30))
+        .shadow(color: .black.opacity(0.55), radius: 50, x: 11, y: 4)
+    }
+
+    private func pillLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 16, weight: .bold))
+            .foregroundStyle(Color(red: 0.047, green: 0.047, blue: 0.047))
+            .padding(.horizontal, 24)
+            .padding(.vertical, 14)
+            .background(.white, in: Capsule())
     }
 }
 
@@ -200,13 +265,12 @@ private struct RoundHistoryRow: View {
         switch outcome {
         case "Win":  return Color(red: 0.29, green: 0.878, blue: 0.4)
         case "Loss": return Color(red: 0.9, green: 0.35, blue: 0.3)
-        default:     return Color.white.opacity(0.5)
+        default:     return .white.opacity(0.5)
         }
     }
 
     var body: some View {
         HStack(spacing: 0) {
-            // Round number
             Text("\(roundNumber)")
                 .font(.system(size: 16, weight: .medium, design: .rounded))
                 .foregroundStyle(.white)
@@ -214,7 +278,6 @@ private struct RoundHistoryRow: View {
 
             Spacer()
 
-            // Choices
             HStack(spacing: 16) {
                 Text(localChoice.symbol)
                     .font(.title2)
@@ -227,7 +290,6 @@ private struct RoundHistoryRow: View {
 
             Spacer()
 
-            // Outcome
             Text(outcome)
                 .font(.system(size: 16, weight: .medium, design: .rounded))
                 .foregroundStyle(outcomeColor)
@@ -237,7 +299,7 @@ private struct RoundHistoryRow: View {
         .padding(.vertical, 12)
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Color.white.opacity(0.15))
+                .fill(.white.opacity(0.15))
                 .frame(height: 1)
         }
     }
