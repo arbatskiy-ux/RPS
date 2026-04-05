@@ -3,7 +3,6 @@ import SwiftUI
 /// Game Screen — displays countdown, symbols, shake mode, and choosing phase.
 struct GameView: View {
     @EnvironmentObject private var appState: AppState
-
     private var engine: GameEngine { appState.gameEngine }
 
     var body: some View {
@@ -17,6 +16,22 @@ struct GameView: View {
                 Spacer()
                 bottomArea
             }
+
+            // Full-screen countdown overlay
+            if case .countdown = engine.phase {
+                CountdownOverlayView(
+                    countdownValue: engine.countdownValue,
+                    countdownLabel: engine.countdownLabel,
+                    currentRound: engine.state.currentRound,
+                    hostName: engine.state.hostName,
+                    guestName: engine.state.guestName,
+                    hostAvatarData: hostAvatarData,
+                    guestAvatarData: guestAvatarData
+                )
+                .ignoresSafeArea()
+                .transition(.opacity)
+            }
+
         }
     }
 
@@ -70,25 +85,7 @@ struct GameView: View {
             ShakeModeView(motionManager: appState.motionManager, engine: engine)
 
         case .countdown:
-            VStack(spacing: 16) {
-                Text("Round \(engine.state.currentRound)")
-                    .font(.title3)
-                    .foregroundStyle(.white.opacity(0.6))
-
-                // "Rock..." / "Paper..." / "Scissors!"
-                Text(engine.countdownLabel)
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .transition(.scale.combined(with: .opacity))
-                    .animation(.easeOut(duration: 0.3), value: engine.countdownLabel)
-                    .id(engine.countdownLabel) // force re-render for animation
-
-                Text("\(engine.countdownValue)")
-                    .font(.system(size: 100, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.3))
-                    .contentTransition(.numericText())
-                    .animation(.easeOut(duration: 0.3), value: engine.countdownValue)
-            }
+            EmptyView() // handled by CountdownOverlayView
 
         case .choosing:
             VStack(spacing: 20) {
@@ -204,6 +201,108 @@ struct ShakeModeView: View {
         .onDisappear {
             motionManager.stopShakeDetection()
         }
+    }
+}
+
+// MARK: - Countdown Overlay
+
+struct CountdownOverlayView: View {
+    let countdownValue: Int
+    let countdownLabel: String
+    let currentRound: Int
+    let hostName: String
+    let guestName: String
+    let hostAvatarData: Data?
+    let guestAvatarData: Data?
+
+    private var themeColor: Color {
+        switch countdownValue {
+        case 3: return Color(red: 0.29, green: 0.878, blue: 0.4)      // Green (Rock)
+        case 2: return Color(red: 0.455, green: 0.165, blue: 0.671)   // Purple (Paper)
+        default: return Color(red: 0.643, green: 0.275, blue: 0.173)  // Red-Orange (Scissors)
+        }
+    }
+
+    private var gradientAccent: Color {
+        switch countdownValue {
+        case 3: return Color(red: 0.31, green: 0.937, blue: 0.404)
+        case 2: return Color(red: 0.463, green: 0.165, blue: 0.678)
+        default: return Color(red: 0.678, green: 0.286, blue: 0.165)
+        }
+    }
+
+    private var cleanLabel: String {
+        countdownLabel
+            .replacingOccurrences(of: "...", with: "")
+            .replacingOccurrences(of: "!", with: "")
+    }
+
+    var body: some View {
+        ZStack {
+            // Dark angled background
+            LinearGradient(
+                stops: [
+                    .init(color: Color(red: 0.047, green: 0.047, blue: 0.047), location: 0.525),
+                    .init(color: Color(red: 0.141, green: 0.29, blue: 0.392), location: 0.99)
+                ],
+                startPoint: UnitPoint(x: 0.6, y: 1.0),
+                endPoint: UnitPoint(x: 0.4, y: 0.0)
+            )
+
+            // Bottom colored glow
+            VStack {
+                Spacer()
+                LinearGradient(
+                    colors: [gradientAccent.opacity(0.8), gradientAccent.opacity(0)],
+                    startPoint: .bottom,
+                    endPoint: .top
+                )
+                .frame(height: 380)
+            }
+
+            // Content
+            VStack(spacing: 0) {
+                Text("Round #\(currentRound)")
+                    .font(.system(size: 50, weight: .semibold, design: .rounded))
+                    .foregroundStyle(themeColor)
+                    .padding(.top, 70)
+
+                // Avatar row
+                HStack(spacing: 20) {
+                    PlayerAvatar(name: hostName, imageData: hostAvatarData, size: 64)
+                        .overlay(Circle().stroke(themeColor, lineWidth: 5))
+
+                    Text("VS")
+                        .font(.system(size: 50, weight: .semibold, design: .rounded))
+                        .foregroundStyle(themeColor)
+
+                    PlayerAvatar(name: guestName, imageData: guestAvatarData, size: 64)
+                        .overlay(Circle().stroke(themeColor, lineWidth: 5))
+                }
+                .padding(.top, 24)
+
+                Spacer()
+
+                // Giant countdown number
+                Text("\(countdownValue)")
+                    .font(.system(size: 300, weight: .bold, design: .rounded))
+                    .foregroundStyle(themeColor)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                    .contentTransition(.numericText())
+
+                // Label (Rock / Paper / Scissors)
+                Text(cleanLabel)
+                    .font(.system(size: 80, weight: .bold, design: .rounded))
+                    .foregroundStyle(themeColor)
+                    .transition(.scale.combined(with: .opacity))
+                    .id(countdownLabel)
+
+                Spacer()
+                    .frame(height: 100)
+            }
+        }
+        .animation(.easeInOut(duration: 0.4), value: countdownValue)
     }
 }
 
