@@ -31,8 +31,8 @@ struct ResultsView: View {
     }
 
     private var accentColor: Color {
-        didWin ? Color(red: 0.31, green: 0.937, blue: 0.404)
-               : Color(red: 0.463, green: 0.165, blue: 0.678)
+        didWin ? Color(red: 0.310, green: 0.937, blue: 0.404)  // #4fef67 green
+               : Color(red: 0.988, green: 0.078, blue: 0.094)  // #fc1418 red
     }
 
     var body: some View {
@@ -143,7 +143,7 @@ struct ResultsView: View {
         }
         .background(
             LinearGradient(
-                colors: [Color(red: 0.047, green: 0.047, blue: 0.047), accentColor.opacity(0.7)],
+                colors: [Color(red: 0.047, green: 0.047, blue: 0.047), accentColor],
                 startPoint: .top, endPoint: .bottom
             )
         )
@@ -279,13 +279,11 @@ private struct RoundHistoryRow: View {
             Spacer()
 
             HStack(spacing: 16) {
-                Text(localChoice.symbol)
-                    .font(.title2)
+                RPSIcon(choice: localChoice, size: 24)
                 Text("VS")
                     .font(.system(size: 16, weight: .medium, design: .rounded))
                     .foregroundStyle(.white)
-                Text(opponentChoice.symbol)
-                    .font(.title2)
+                RPSIcon(choice: opponentChoice, size: 24)
             }
 
             Spacer()
@@ -302,5 +300,27 @@ private struct RoundHistoryRow: View {
                 .fill(.white.opacity(0.15))
                 .frame(height: 1)
         }
+    }
+}
+
+// MARK: - RPS choice icon using SF Symbols (emoji rendering unreliable on iOS 26)
+
+private struct RPSIcon: View {
+    let choice: RPSChoice
+    let size: CGFloat
+
+    private var systemName: String {
+        switch choice {
+        case .rock:     return "circle.fill"
+        case .paper:    return "hand.raised.fill"
+        case .scissors: return "scissors"
+        }
+    }
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: size, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: size + 8, height: size + 8)
     }
 }
