@@ -387,6 +387,7 @@ struct RevealView: View {
         switch (localChoice, outcome) {
         case (.rock,     .win):  return "rock_win"
         case (.rock,     .lose): return "rock_lose"
+        case (.paper,    .win):  return "paper_win"
         case (.paper,    .lose): return "paper_lose"
         case (.scissors, .win):  return "scissors_win"
         case (.scissors, .lose): return "scissors_lose"
@@ -425,58 +426,80 @@ struct RevealView: View {
     }
 
     var body: some View {
-        ZStack {
-            LinearGradient(colors: [bgTop, bgBottom], startPoint: .top, endPoint: .bottom)
+        GeometryReader { geo in
+            ZStack(alignment: .top) {
+                // Dark background
+                bgTop.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                Text("Round \(result.round)")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .padding(.top, 60)
-
-                Spacer()
-
-                // Character illustration
+                // Character — sized to ~69% height, 73% width, top-offset 16.5% (Figma 416:494)
                 let imgName = characterImageName
                 if !imgName.isEmpty {
                     Image(imgName)
                         .resizable()
                         .scaledToFit()
-                        .padding(.horizontal, 8)
+                        .frame(
+                            width:  geo.size.width  * 0.73,
+                            height: geo.size.height * 0.69
+                        )
+                        .position(
+                            x: geo.size.width  * 0.1372 + geo.size.width  * 0.73 / 2,
+                            y: geo.size.height * 0.1654 + geo.size.height * 0.69 / 2
+                        )
                 } else {
                     Image(systemName: localChoice == .paper ? "hand.raised.fill" : "scissors")
-                        .font(.system(size: 120))
+                        .font(.system(size: 140))
                         .foregroundStyle(.white.opacity(0.6))
-                        .padding(.bottom, 40)
+                        .position(x: geo.size.width / 2, y: geo.size.height * 0.38)
                 }
 
-                // Result text
-                VStack(alignment: .leading, spacing: -8) {
-                    Text(resultLine1)
-                        .font(.system(size: 80, weight: .heavy, design: .rounded))
+                // Gradient overlay ON TOP of character — transparent → accent, overlaps legs
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear,   location: 0.0),
+                        .init(color: .clear,   location: 0.42),
+                        .init(color: bgBottom, location: 0.78),
+                        .init(color: bgBottom, location: 1.0),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+
+                // UI overlay: Round label + text + button
+                VStack(spacing: 0) {
+                    Text("Round \(result.round)")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
-                    if !resultLine2.isEmpty {
-                        Text(resultLine2)
+                        .padding(.top, 60)
+
+                    Spacer()
+
+                    VStack(alignment: .center, spacing: -20) {
+                        Text(resultLine1)
                             .font(.system(size: 80, weight: .heavy, design: .rounded))
                             .foregroundStyle(.white)
+                        if !resultLine2.isEmpty {
+                            Text(resultLine2)
+                                .font(.system(size: 80, weight: .heavy, design: .rounded))
+                                .foregroundStyle(.white)
+                        }
                     }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 30)
-                .padding(.top, 8)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.horizontal, 30)
 
-                // Next round button
-                Text(result.winnerName == nil ? "Replaying..." : "Next round")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                    .background(buttonColor, in: Capsule())
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-                    .padding(.bottom, 50)
+                    Text(result.winnerName == nil ? "Replaying..." : "Next round")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(buttonColor, in: Capsule())
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+                        .padding(.bottom, 50)
+                }
             }
         }
+        .ignoresSafeArea()
         .animation(.easeInOut(duration: 0.4), value: result.round)
     }
 }
