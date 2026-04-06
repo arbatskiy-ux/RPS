@@ -134,8 +134,7 @@ private struct GamePreviewWrapper: View {
                 Spacer()
 
                 if case .choosing = phase {
-                    RPSChoiceButtons { _ in }
-                        .padding(.bottom, 40)
+                    ChooseMoveView(timeRemaining: 5) { _ in }
                 }
             }
         }

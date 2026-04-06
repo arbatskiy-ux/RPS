@@ -4,13 +4,16 @@ import Combine
 /// Global application state shared across the entire app.
 final class AppState: ObservableObject {
     enum Screen {
+        case onboarding
         case home
         case connection
         case game
         case results
     }
 
-    @Published var currentScreen: Screen = .home
+    @Published var currentScreen: Screen = {
+        UserDefaults.standard.bool(forKey: "hasSeenOnboarding") ? .home : .onboarding
+    }()
 
     /// Player's custom display name — persisted across app launches.
     @Published var playerName: String {
@@ -75,6 +78,7 @@ final class AppState: ObservableObject {
                 case .matchResult:
                     self?.currentScreen = .results
                 case .idle:
+                    guard self?.currentScreen != .onboarding else { return }
                     if self?.session.isConnected == true {
                         self?.currentScreen = .connection
                     } else {
