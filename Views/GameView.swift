@@ -214,8 +214,8 @@ struct ChooseMoveView: View {
 
                 // Full-screen emoji (expands to center after pop)
                 if emojiExpanded, let choice = tappedChoice {
-                    Text(choice.symbol)
-                        .font(.system(size: 270))
+                    EmojiLabel(text: choice.symbol, size: 240)
+                        .frame(width: 280, height: 280)
                         .rotationEffect(choice == .paper ? .degrees(-15) : .zero)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .transition(.scale(scale: 0.25).combined(with: .opacity))
@@ -251,11 +251,9 @@ struct ChooseMoveView: View {
                     .foregroundStyle(.white)
                     .opacity(isSelected ? 0 : 1)
                 Spacer()
-                // Space placeholder where emoji normally sits
-                Color.clear.frame(width: 64, height: 50)
             }
+            .frame(maxWidth: .infinity, minHeight: 80)
             .padding(.horizontal, 30)
-            .frame(height: 80)
             .background(choice.buttonGradient)
             .clipShape(RoundedRectangle(cornerRadius: 40))
             .overlay(RoundedRectangle(cornerRadius: 40).stroke(choice.borderColor, lineWidth: 2))
@@ -263,17 +261,19 @@ struct ChooseMoveView: View {
             // Emoji (NOT inside clipped capsule — floats freely)
             HStack {
                 Spacer()
-                Text(choice.symbol)
-                    .font(.system(size: isSelected && emojiPopped ? 88 : 50))
+                let emojiSize: CGFloat = isSelected && emojiPopped ? 80 : 46
+                EmojiLabel(text: choice.symbol, size: emojiSize)
+                    .frame(width: emojiSize + 8, height: emojiSize + 8)
                     .offset(y: isSelected && emojiPopped ? -64 : 0)
                     .animation(
                         .spring(response: 0.35, dampingFraction: 0.45),
                         value: emojiPopped
                     )
-                    .padding(.trailing, 26)
+                    .padding(.trailing, 20)
             }
-            .frame(height: 80)
+            .frame(maxWidth: .infinity, minHeight: 80)
         }
+        .frame(maxWidth: .infinity, minHeight: 80)
         .contentShape(Rectangle())
         .onTapGesture {
             handleTap(choice)
@@ -339,6 +339,29 @@ private extension RPSChoice {
         case .paper:    return Color(hex: "762aad")
         case .scissors: return Color(hex: "731900")
         }
+    }
+}
+
+// MARK: - Emoji view (UILabel for reliable Color Emoji rendering on all iOS versions)
+
+import UIKit
+
+struct EmojiLabel: UIViewRepresentable {
+    let text: String
+    let size: CGFloat
+
+    func makeUIView(context: Context) -> UILabel {
+        let label = UILabel()
+        label.textAlignment = .center
+        label.backgroundColor = .clear
+        label.setContentHuggingPriority(.required, for: .horizontal)
+        label.setContentHuggingPriority(.required, for: .vertical)
+        return label
+    }
+
+    func updateUIView(_ label: UILabel, context: Context) {
+        label.text = text
+        label.font = UIFont.systemFont(ofSize: size)
     }
 }
 
