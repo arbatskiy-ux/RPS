@@ -11,6 +11,10 @@ struct GameView: View {
         return false
     }
 
+    // Keeps overlay alive through the full emoji animation even after engine moves on
+    @State private var showChooseOverlay = false
+    @State private var cachedTimeRemaining = 5
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -23,15 +27,27 @@ struct GameView: View {
             }
 
             // Full-screen Choose Move overlay
-            if isChoosing {
-                ChooseMoveView(timeRemaining: engine.choiceTimeRemaining) { choice in
+            if showChooseOverlay {
+                ChooseMoveView(
+                    timeRemaining: isChoosing ? engine.choiceTimeRemaining : cachedTimeRemaining
+                ) { choice in
                     engine.choose(choice)
+                } onAnimationComplete: {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        showChooseOverlay = false
+                    }
                 }
                 .ignoresSafeArea()
                 .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: isChoosing)
+        .animation(.easeInOut(duration: 0.3), value: showChooseOverlay)
+        .onChange(of: isChoosing) { nowChoosing in
+            if nowChoosing {
+                cachedTimeRemaining = engine.choiceTimeRemaining
+                showChooseOverlay = true
+            }
+        }
     }
 
     // MARK: - Top Bar
@@ -120,6 +136,7 @@ struct GameView: View {
 struct ChooseMoveView: View {
     let timeRemaining: Int
     let onChoice: (RPSChoice) -> Void
+    let onAnimationComplete: () -> Void
 
     @State private var tappedChoice: RPSChoice? = nil
     @State private var emojiPopped = false
@@ -276,6 +293,10 @@ struct ChooseMoveView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
             withAnimation(.spring(response: 0.55, dampingFraction: 0.7)) {
                 emojiExpanded = true
+            }
+            // Hold fullscreen emoji ~4s then hand off to result screen
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                onAnimationComplete()
             }
         }
     }

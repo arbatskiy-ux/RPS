@@ -134,7 +134,7 @@ private struct GamePreviewWrapper: View {
                 Spacer()
 
                 if case .choosing = phase {
-                    ChooseMoveView(timeRemaining: 5) { _ in }
+                    ChooseMoveView(timeRemaining: 5) { _ in } onAnimationComplete: {}
                 }
             }
         }
